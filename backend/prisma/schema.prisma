@@ -1,0 +1,455 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. User & Access Management
+// ==========================================
+enum Role {
+  PEMOHON
+  ADMIN
+  KASUBAG_TU
+  KEPALA_UPTD
+  SEKRETARIS
+  KEPALA_DINAS
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  role          Role           @default(PEMOHON)
+  isVerified    Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  profile       Profile?
+  employee      Employee?
+  refreshTokens RefreshToken[]
+  bookings      Booking[]
+  favorites     Favorite[]
+  auditLogs     AuditLog[]
+  announcements Announcement[] @relation("AnnouncementCreatedBy")
+}
+
+model Profile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  fullName        String
+  nikEncrypted    String
+  phone           String
+  address         String?
+  institutionName String?
+  institutionType String? // enum: PEMERINTAH, SWASTA, PENDIDIKAN, KOMUNITAS, PERSONAL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model Employee {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  nip             String?         @unique
+  fullName        String
+  position        String
+  phoneEncrypted  String
+  picCompetencies String[] // Menyimpan enum PicRole dalam array string
+  isPicEligible   Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  user            User            @relation(fields: [userId], references: [id])
+  assignments     PicAssignment[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+// ==========================================
+// 2. Master Data (Building & Services)
+// ==========================================
+model Building {
+  id          String   @id @default(cuid())
+  name        String
+  address     String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rooms       Room[]
+}
+
+model Room {
+  id          String      @id @default(cuid())
+  buildingId  String
+  name        String
+  capacity    Int
+  floor       Int?
+  description String?
+  facilities  String[]
+  requiresPic Boolean     @default(true) // OQ-007: Default true untuk semua ruangan
+  bookingUnit BookingUnit @default(HOURLY) // HOURLY, FULL_DAY, BOTH
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  building    Building    @relation(fields: [buildingId], references: [id])
+  bookings    Booking[]
+  tariffs     Tariff[]
+}
+
+enum BookingUnit {
+  HOURLY
+  FULL_DAY
+  BOTH
+}
+
+model Service {
+  id                  String    @id @default(cuid())
+  code                String    @unique // e.g., "SVC-001"
+  name                String
+  description         String?
+  requiresDisposition Boolean   @default(true)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  bookings            Booking[]
+}
+
+model Tariff {
+  id        String            @id @default(cuid())
+  roomId    String?
+  serviceId String?
+  category  ApplicantCategory
+  price     Decimal           @db.Decimal(15, 2)
+  unit      TariffUnit
+  validFrom DateTime
+  validTo   DateTime?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  room      Room?             @relation(fields: [roomId], references: [id])
+}
+
+enum ApplicantCategory {
+  PEMERINTAH_PUSAT
+  PEMERINTAH_DAERAH
+  PEMERINTAH_CIMAHI
+  SWASTA
+  PENDIDIKAN
+  KOMUNITAS
+  PERSONAL
+}
+
+enum TariffUnit {
+  HOURLY
+  HALF_DAY
+  FULL_DAY
+  MONTHLY
+  YEARLY
+  FLAT
+}
+
+// ==========================================
+// 3. Core Booking & Workflow
+// ==========================================
+enum BookingState {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  REVISION_NEEDED
+  APPROVED
+  WAITING_PAYMENT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+model Booking {
+  id                   String       @id @default(cuid())
+  bookingNumber        String       @unique
+  userId               String
+  serviceId            String
+  roomId               String?
+  dateStart            DateTime
+  dateEnd              DateTime
+  eventName            String
+  attendeesDescription String?      // Deskripsi peserta (siapa)
+  activityPurpose      String?      // Tujuan kegiatan
+  activityDescription  String?      // Deskripsi kegiatan
+  applicantCategory    ApplicantCategory? // Kategori pemohon
+  participantCount     Int?
+  state                BookingState @default(DRAFT)
+  revisionNote         String?      // Catatan admin saat minta perbaikan
+  skmDone              Boolean      @default(false)
+  isCancelledAfterH7   Boolean      @default(false)
+  rescheduleCount      Int          @default(0)
+  rejectionReason      String?
+  cancellationReason   String?
+  paymentDeadline      DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id])
+  service        Service          @relation(fields: [serviceId], references: [id])
+  room           Room?            @relation(fields: [roomId], references: [id])
+  payment        Payment?
+  documents      Document[]
+  picAssignments PicAssignment[]
+  history        BookingHistory[]
+  skmResponse    SkmResponse?
+}
+
+model BookingHistory {
+  id           String   @id @default(cuid())
+  bookingId    String
+  oldDateStart DateTime
+  newDateStart DateTime
+  reason       String
+  createdAt    DateTime @default(now())
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+}
+
+// ==========================================
+// 4. PIC Assignment
+// ==========================================
+enum PicRole {
+  MAIN_PIC
+  VIDEOTRON_OPERATOR
+  CLEANING_STAFF
+  TECHNICIAN
+  OTHER
+}
+
+model PicAssignment {
+  id           String   @id @default(cuid())
+  bookingId    String
+  employeeId   String
+  role         PicRole
+  assignedById String
+  assignedAt   DateTime @default(now())
+  booking      Booking  @relation(fields: [bookingId], references: [id])
+  employee     Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([bookingId, role])
+}
+
+// ==========================================
+// 5. Documents & Dossiers
+// ==========================================
+enum DocumentType {
+  SURAT_PERMOHONAN
+  PROPOSAL
+  KTP
+  LEMBAR_DISPOSISI
+  BUKTI_BAYAR
+  FOTO_KEGIATAN
+  OTHER
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  bookingId    String
+  type         DocumentType
+  version      Int          @default(1)
+  minioKey     String
+  originalName String
+  uploadedById String
+  createdAt    DateTime     @default(now())
+  booking      Booking      @relation(fields: [bookingId], references: [id])
+}
+
+// ==========================================
+// 6. Payment
+// ==========================================
+enum PaymentState {
+  PENDING
+  PROOF_UPLOADED
+  VERIFIED
+  REJECTED
+}
+
+enum PaymentSource {
+  APPLICANT_PORTAL
+  ADMIN_WHATSAPP
+}
+
+model Payment {
+  id                      String         @id @default(cuid())
+  bookingId               String         @unique
+  paymentRef              String?
+  amount                  Decimal        @db.Decimal(15, 2)
+  qrisImageKey            String?
+  proofMinioKey           String?
+  state                   PaymentState   @default(PENDING)
+  verifiedById            String?
+  verifiedAt              DateTime?
+  rejectionReason         String?
+  uploadedAt              DateTime?
+  source                  PaymentSource?
+  toleranceRequestedAt    DateTime?
+  toleranceRequestedById  String?
+  toleranceApprovedById   String?
+  toleranceApprovedAt     DateTime?
+  toleranceApproved       Boolean?
+  toleranceRejectedReason String?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  booking                 Booking        @relation(fields: [bookingId], references: [id])
+}
+
+// ==========================================
+// 7. Audit & Logs
+// ==========================================
+enum AuditAction {
+  CREATE
+  UPDATE
+  STATE_CHANGE
+  DELETE
+  APPROVE
+  REJECT
+  CANCEL
+  RESCHEDULE
+  PAYMENT_VERIFY
+  PIC_ASSIGN
+}
+
+model AuditLog {
+  id            String      @id @default(cuid())
+  modelName     String
+  recordId      String
+  recordRef     String?
+  action        AuditAction
+  fieldName     String?
+  oldValue      String?
+  newValue      String?
+  reason        String?
+  ipAddress     String?
+  performedById String
+  performedAt   DateTime    @default(now())
+  performedBy   User        @relation(fields: [performedById], references: [id])
+}
+
+model IntegrationLog {
+  id           String   @id @default(cuid())
+  system       String // WADUH, PKL, WA
+  endpoint     String
+  requestData  String?
+  responseData String?
+  statusCode   Int?
+  isSuccess    Boolean
+  durationMs   Int?
+  createdAt    DateTime @default(now())
+}
+
+// ==========================================
+// 8. Communications & Feedback
+// ==========================================
+enum SkmState {
+  PENDING
+  COMPLETED
+  TIMEOUT
+}
+
+model SkmResponse {
+  id          String    @id @default(cuid())
+  bookingId   String    @unique
+  rating      Int?
+  feedback    String?
+  state       SkmState  @default(PENDING)
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+  booking     Booking   @relation(fields: [bookingId], references: [id])
+}
+
+enum WaDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum WaStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model WhatsAppMessage {
+  id         String      @id @default(cuid())
+  bookingId  String?
+  direction  WaDirection
+  recipient  String
+  templateId String?
+  content    String
+  status     WaStatus    @default(QUEUED)
+  sentAt     DateTime?
+  createdAt  DateTime    @default(now())
+}
+
+// ==========================================
+// 9. Config & Master Data Minor
+// ==========================================
+model SystemConfig {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+}
+
+model FokusCatalog {
+  id            String   @id @default(cuid())
+  productName   String
+  category      String
+  description   String?
+  imageMinioKey String
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+enum FavoriteType {
+  ROOM
+  WORKING_SPACE
+}
+
+model Favorite {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  favoriteType FavoriteType
+  roomId       String?
+  serviceId    String?
+  createdAt    DateTime     @default(now())
+
+  @@unique([userId, favoriteType, roomId, serviceId])
+  @@index([userId])
+}
+
+// ==========================================
+// Announcement — Pengumuman publik di landing
+// ==========================================
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  isActive    Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  expiresAt   DateTime?
+  createdById String
+  createdBy   User     @relation("AnnouncementCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, publishedAt])
+}

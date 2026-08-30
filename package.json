@@ -1,0 +1,14 @@
+{
+  "name": "ctp-portal",
+  "private": true,
+  "version": "1.0.0",
+  "description": "CTP Digital Service Portal",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "build": "pnpm --parallel run build",
+    "lint": "pnpm --parallel run lint"
+  }
+}
