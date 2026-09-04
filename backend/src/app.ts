@@ -36,6 +36,8 @@ import auditRoutes from './routes/audit.routes';
 import skmRoutes from './routes/skm.routes';
 import reportRoutes from './routes/report.routes';
 import announcementRoutes from './routes/announcement.routes';
+import fokusRoutes from './routes/fokus.routes';
+import searchRoutes from './routes/search.routes';
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -47,6 +49,8 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/skm', skmRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/fokus', fokusRoutes);
+app.use('/api/search', searchRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

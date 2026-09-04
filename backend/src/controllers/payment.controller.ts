@@ -45,3 +45,18 @@ export const rejectPaymentProof = async (req: Request, res: Response, next: Next
     res.json(result);
   } catch (error) { next(error); }
 };
+
+export const requestTolerance = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await paymentService.requestPaymentTolerance(req.params.bookingId, req.user!.id);
+    res.json(result);
+  } catch (error) { next(error); }
+};
+
+export const decideTolerance = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { approved, reason } = req.body;
+    const result = await paymentService.decidePaymentTolerance(req.params.bookingId, req.user!.id, approved, reason);
+    res.json(result);
+  } catch (error) { next(error); }
+};

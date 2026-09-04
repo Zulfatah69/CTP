@@ -13,4 +13,8 @@ router.post('/:bookingId/upload-proof', authenticate, paymentController.uploadMi
 router.post('/:bookingId/verify', authenticate, requireRole(ADMIN_ROLES), paymentController.verifyPayment);
 router.post('/:bookingId/reject-proof', authenticate, requireRole(ADMIN_ROLES), paymentController.rejectPaymentProof);
 
+// Toleransi pembayaran
+router.post('/:bookingId/request-tolerance', authenticate, requireRole([Role.ADMIN, Role.KASUBAG_TU]), paymentController.requestTolerance);
+router.post('/:bookingId/decide-tolerance', authenticate, requireRole([Role.KEPALA_UPTD]), paymentController.decideTolerance);
+
 export default router;

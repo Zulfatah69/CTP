@@ -45,7 +45,7 @@ export default function Login() {
 
       // Redirect based on role
       const role = response.data.user.role;
-      if (role === 'PEMOHON') navigate('/portal');
+      if (role === 'PEMOHON') navigate('/portal/dashboard');
       else navigate('/admin');
     } catch (error: any) {
       toast({

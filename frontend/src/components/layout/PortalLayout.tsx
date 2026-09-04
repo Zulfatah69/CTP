@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { Building2, Calendar, FileText, LogOut, User } from 'lucide-react';
+import { Building2, Calendar, FileText, LayoutDashboard, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function PortalLayout() {
@@ -9,6 +9,7 @@ export default function PortalLayout() {
   const { user, logout } = useAuthStore();
 
   const navItems = [
+    { label: 'Dashboard Saya', path: '/portal/dashboard', icon: LayoutDashboard },
     { label: 'Form Pengajuan', path: '/portal', icon: FileText },
     { label: 'Kalender Jadwal', path: '/portal/calendar', icon: Calendar },
   ];

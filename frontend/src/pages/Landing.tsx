@@ -53,7 +53,7 @@ const SERVICES = [
     category: 'Pemberdayaan Usaha',
     description: 'Layanan pemotretan profesional dan etalase digital produk industri kreatif UMKM Cimahi.',
     icon: Camera,
-    href: '#fokus',
+    href: '/fokus',
   },
   {
     code: 'SVC-005',
@@ -86,6 +86,28 @@ export default function Landing() {
   const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      api
+        .get('/search', { params: { q: searchQuery.trim() } })
+        .then((res) => {
+          setSearchResults(res.data.results || []);
+          setSearchOpen(true);
+        })
+        .catch(() => {});
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     // Load public announcements
@@ -195,8 +217,50 @@ export default function Landing() {
                 placeholder="Cari ruangan, layanan, atau ketentuan..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (searchResults.length > 0) setSearchOpen(true);
+                }}
                 className="w-full h-11 pl-10 pr-4 text-sm text-neutral-900 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-xs"
               />
+
+              {/* Search Results Dropdown */}
+              {searchOpen && (
+                <div className="absolute top-12 left-0 right-0 bg-white rounded-lg border border-neutral-200 shadow-lg z-50 text-left overflow-hidden divide-y divide-neutral-100 max-h-80 overflow-y-auto">
+                  {searchResults.length === 0 ? (
+                    <div className="p-3 text-xs text-neutral-500 text-center">
+                      Tidak ditemukan hasil untuk "{searchQuery}"
+                    </div>
+                  ) : (
+                    searchResults.map((item) => (
+                      <Link
+                        key={`${item.type}-${item.id}`}
+                        to={item.href}
+                        onClick={() => {
+                          setSearchOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="p-3 hover:bg-neutral-50 flex items-start gap-3 transition-colors group"
+                      >
+                        <div className="mt-0.5 p-1.5 rounded-md bg-neutral-100 text-neutral-600 group-hover:bg-primary-50 group-hover:text-primary-800">
+                          {item.type === 'ROOM' && <Building2 className="w-4 h-4" />}
+                          {item.type === 'BUILDING' && <Building2 className="w-4 h-4" />}
+                          {item.type === 'ANNOUNCEMENT' && <Bell className="w-4 h-4" />}
+                          {item.type === 'FOKUS' && <Camera className="w-4 h-4" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-xs text-neutral-900 group-hover:text-primary-900 truncate">
+                            {item.title}
+                          </div>
+                          <div className="text-[11px] text-neutral-500 truncate">
+                            {item.subtitle}
+                          </div>
+                        </div>
+                        <ArrowRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-primary-700 shrink-0 self-center" />
+                      </Link>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

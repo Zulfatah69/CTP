@@ -12,6 +12,8 @@ import {
   UserCheck,
   Search,
   ExternalLink,
+  Camera,
+  ShieldAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -19,11 +21,17 @@ export default function AdminLayout() {
   const location = useLocation();
   const { user, logout } = useAuthStore();
 
+  const isLeadership = ['KEPALA_UPTD', 'ADMIN', 'KASUBAG_TU'].includes(user?.role || '');
+
   const navItems = [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Kelola Booking', path: '/admin/bookings', icon: CalendarDays },
     { label: 'Kalender Operasional', path: '/admin/calendar', icon: CalendarDays },
     { label: 'Master Gedung', path: '/admin/buildings', icon: Building2 },
+    { label: 'Katalog FOKUS', path: '/admin/fokus', icon: Camera },
+    ...(isLeadership
+      ? [{ label: 'Toleransi Bayar', path: '/admin/tolerance', icon: ShieldAlert }]
+      : []),
     { label: 'Pengumuman', path: '/admin/announcements', icon: Megaphone },
     { label: 'Laporan & Statistik', path: '/admin/reports', icon: BarChart3 },
     { label: 'Audit Trail', path: '/admin/audit', icon: ShieldCheck },

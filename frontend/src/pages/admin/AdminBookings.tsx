@@ -22,6 +22,7 @@ import {
   CreditCard,
   Check,
   X,
+  ShieldAlert,
 } from 'lucide-react';
 
 const PIC_ROLES = [
@@ -610,6 +611,36 @@ export default function AdminBookings() {
                       >
                         Tolak Bukti
                       </Button>
+                    )}
+                    {!b.payment?.toleranceRequestedAt && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-amber-700 border-amber-300 hover:bg-amber-50 text-xs h-9"
+                        onClick={() => {
+                          if (confirm('Ajukan permohonan toleransi pembayaran H-1 ke Kepala UPTD?'))
+                            action(
+                              `/payments/${b.id}/request-tolerance`,
+                              {},
+                              'Permohonan toleransi berhasil diajukan ke Kepala UPTD.'
+                            );
+                        }}
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+                        Ajukan Toleransi
+                      </Button>
+                    )}
+                    {b.payment?.toleranceRequestedAt && b.payment?.toleranceApproved === null && (
+                      <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded flex items-center gap-1 font-semibold">
+                        <Clock className="w-3 h-3" />
+                        Toleransi Menunggu Keputusan
+                      </span>
+                    )}
+                    {b.payment?.toleranceApproved === true && (
+                      <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1.5 rounded flex items-center gap-1 font-semibold">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Toleransi Disetujui Kepala UPTD
+                      </span>
                     )}
                   </>
                 )}

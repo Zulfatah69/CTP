@@ -72,3 +72,51 @@ export const rejectPaymentProof = async (bookingId: string, adminId: string, rea
 
   return { message: 'Bukti pembayaran ditolak' };
 };
+
+// Admin ajukan toleransi ke Kepala UPTD
+export const requestPaymentTolerance = async (bookingId: string, adminId: string) => {
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { payment: true } });
+  if (!booking) throw new ApiError(404, 'Booking tidak ditemukan');
+  if (booking.state !== BookingState.WAITING_PAYMENT) throw new ApiError(400, 'Booking harus dalam status WAITING_PAYMENT');
+  if (!booking.payment) throw new ApiError(400, 'Data pembayaran tidak ditemukan');
+  if (booking.payment.toleranceRequestedAt) throw new ApiError(400, 'Permintaan toleransi sudah pernah diajukan');
+
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { bookingId },
+      data: { toleranceRequestedAt: new Date(), toleranceRequestedById: adminId }
+    }),
+    prisma.auditLog.create({
+      data: { modelName: 'Payment', recordId: booking.payment.id, recordRef: booking.bookingNumber, action: AuditAction.UPDATE, performedById: adminId, reason: 'Admin mengajukan toleransi pembayaran H-1 ke Kepala UPTD' }
+    })
+  ]);
+  return { message: 'Permintaan toleransi berhasil diajukan ke Kepala UPTD' };
+};
+
+// Kepala UPTD approve/reject toleransi
+export const decidePaymentTolerance = async (bookingId: string, kepalaId: string, approved: boolean, reason?: string) => {
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId }, include: { payment: true } });
+  if (!booking) throw new ApiError(404, 'Booking tidak ditemukan');
+  if (!booking.payment?.toleranceRequestedAt) throw new ApiError(400, 'Belum ada permintaan toleransi untuk booking ini');
+  if (booking.payment.toleranceApprovedAt) throw new ApiError(400, 'Toleransi sudah diputuskan sebelumnya');
+
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { bookingId },
+      data: {
+        toleranceApprovedById: kepalaId,
+        toleranceApprovedAt: new Date(),
+        toleranceApproved: approved,
+        toleranceRejectedReason: !approved ? (reason || 'Ditolak') : null,
+      }
+    }),
+    prisma.auditLog.create({
+      data: {
+        modelName: 'Payment', recordId: booking.payment.id, recordRef: booking.bookingNumber,
+        action: AuditAction.UPDATE, performedById: kepalaId,
+        reason: approved ? 'Kepala UPTD menyetujui toleransi pembayaran' : `Kepala UPTD menolak toleransi: ${reason || ''}`
+      }
+    })
+  ]);
+  return { message: approved ? 'Toleransi disetujui. Booking tetap aktif.' : 'Toleransi ditolak.' };
+};

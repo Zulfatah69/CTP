@@ -412,10 +412,14 @@ model FokusCatalog {
   id            String   @id @default(cuid())
   productName   String
   category      String
+  ownerName     String?
   description   String?
-  imageMinioKey String
+  // ponytail: imageUrl = URL eksternal sementara, ganti ke imageMinioKey saat MinIO aktif
+  imageUrl      String?
+  imageMinioKey String?
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 enum FavoriteType {

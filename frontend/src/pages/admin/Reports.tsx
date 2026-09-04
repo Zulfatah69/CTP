@@ -106,6 +106,36 @@ export default function Reports() {
     document.body.removeChild(link);
   };
 
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  const handleExportExcel = async () => {
+    try {
+      setExportingExcel(true);
+      const params: any = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (status) params.status = status;
+
+      const response = await api.get('/reports/export-excel', {
+        params,
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Laporan_Booking_CTP_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('Gagal mengekspor data Excel. Silakan coba lagi.');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-neutral-200">
@@ -117,13 +147,24 @@ export default function Reports() {
             Rekapitulasi pemanfaatan ruangan, realisasi tarif retribusi, dan evaluasi kepuasan SKM.
           </p>
         </div>
-        <Button
-          onClick={handleExportCSV}
-          className="bg-primary-700 hover:bg-primary-900 text-white font-semibold text-xs h-9 px-4 shrink-0 shadow-xs"
-        >
-          <Download className="w-4 h-4 mr-1.5" />
-          Ekspor Data CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleExportExcel}
+            disabled={exportingExcel}
+            className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs h-9 px-4 shrink-0 shadow-xs"
+          >
+            <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+            {exportingExcel ? 'Mengunduh...' : 'Ekspor Excel (.xlsx)'}
+          </Button>
+          <Button
+            onClick={handleExportCSV}
+            variant="outline"
+            className="border-neutral-300 text-neutral-700 hover:bg-neutral-50 font-semibold text-xs h-9 px-4 shrink-0 shadow-xs"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Ekspor CSV
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}

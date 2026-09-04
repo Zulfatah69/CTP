@@ -1,4 +1,5 @@
 import { prisma } from '../utils/prisma';
+import * as XLSX from 'xlsx';
 import { BookingState } from '@prisma/client';
 
 export const getBookingReport = async (filters: {
@@ -78,4 +79,31 @@ export const getBookingReport = async (filters: {
       skmRating: b.skmResponse?.rating || null
     }))
   };
+};
+
+export const exportBookingsExcel = async (filters: { startDate?: string; endDate?: string; status?: string }) => {
+  const report = await getBookingReport(filters);
+
+  const headers = ['No Booking', 'Pemohon', 'Email', 'Kegiatan', 'Ruangan', 'Gedung', 'Waktu Mulai', 'Waktu Selesai', 'Peserta', 'Status', 'Biaya (Rp)', 'Status Bayar', 'SKM Rating'];
+
+  const rows = report.bookings.map(b => [
+    b.bookingNumber,
+    b.applicantName,
+    b.applicantEmail,
+    b.eventName,
+    b.roomName,
+    b.buildingName,
+    new Date(b.dateStart).toLocaleString('id-ID'),
+    new Date(b.dateEnd).toLocaleString('id-ID'),
+    b.participantCount ?? '-',
+    b.state,
+    b.paymentAmount,
+    b.paymentState,
+    b.skmRating ?? '-',
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Laporan Booking');
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
 };

@@ -19,6 +19,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
+import { useAuthStore } from '@/store/authStore';
+
 interface DashboardStats {
   total: number;
   byState: Record<string, number>;
@@ -47,13 +49,11 @@ const ALL_STATUSES = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ role: string; email: string } | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored) setUser(JSON.parse(stored));
     fetchStats();
   }, []);
 
@@ -97,12 +97,39 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-neutral-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-950">Dashboard Operasional</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-950">Dashboard Operasional</h1>
+            {user?.role === 'KEPALA_UPTD' && (
+              <span className="bg-primary-900 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                Kepala UPTD
+              </span>
+            )}
+            {user?.role === 'KASUBAG_TU' && (
+              <span className="bg-accent-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                Kasubag TU
+              </span>
+            )}
+            {(user?.role === 'SEKRETARIS' || user?.role === 'KEPALA_DINAS') && (
+              <span className="bg-purple-900 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                Dinas
+              </span>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
             Selamat bertugas, <b>{user?.email}</b> &bull; UPTD Cimahi Techno Park & Gedung BITC
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {user?.role === 'KEPALA_UPTD' && (
+            <Button
+              size="sm"
+              onClick={() => navigate('/admin/tolerance')}
+              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold h-9"
+            >
+              <Clock className="w-4 h-4 mr-1.5" />
+              Persetujuan Toleransi H-1
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={() => navigate('/admin/bookings')}
