@@ -10,8 +10,8 @@ const router = Router();
 // ==========================================
 // Buildings (Gedung)
 // ==========================================
-// Public/All authenticated users can GET buildings (for booking forms)
-router.get('/buildings', authenticate, masterController.getBuildings);
+// Public: view buildings and rooms for public catalog and booking forms
+router.get('/buildings', masterController.getBuildings);
 
 // Only ADMIN and above can modify master data
 router.post('/buildings', authenticate, requireRole([Role.ADMIN, Role.KEPALA_UPTD]), validate(createBuildingSchema), masterController.createBuilding);

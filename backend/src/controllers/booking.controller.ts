@@ -14,6 +14,41 @@ export const getBookings = async (req: Request, res: Response, next: NextFunctio
   } catch (error) { next(error); }
 };
 
+export const getPublicCalendar = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bookings = await prisma.booking.findMany({
+      where: {
+        state: { in: ['APPROVED', 'ACTIVE', 'COMPLETED', 'WAITING_PAYMENT'] }
+      },
+      select: {
+        id: true,
+        eventName: true,
+        dateStart: true,
+        dateEnd: true,
+        state: true,
+        participantCount: true,
+        room: {
+          select: {
+            id: true,
+            name: true,
+            building: {
+              select: { id: true, name: true }
+            }
+          }
+        },
+        user: {
+          select: {
+            fullName: true,
+            institutionName: true
+          }
+        }
+      },
+      orderBy: { dateStart: 'asc' }
+    });
+    res.json(bookings);
+  } catch (error) { next(error); }
+};
+
 export const getBooking = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const isAdmin = req.user?.role !== 'PEMOHON';

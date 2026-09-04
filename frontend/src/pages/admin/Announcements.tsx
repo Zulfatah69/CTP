@@ -5,6 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { id as idLocale } from 'date-fns/locale';
+import {
+  Megaphone,
+  Plus,
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+  Calendar,
+  CheckCircle2,
+  Clock,
+} from 'lucide-react';
 
 export default function Announcements() {
   const { toast } = useToast();
@@ -24,7 +36,11 @@ export default function Announcements() {
       const { data } = await api.get('/announcements/all');
       setAnnouncements(data);
     } catch (e: any) {
-      toast({ title: 'Gagal memuat pengumuman', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Memuat Pengumuman',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -49,19 +65,23 @@ export default function Announcements() {
           content,
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         });
-        toast({ title: '✅ Pengumuman berhasil diperbarui' });
+        toast({ title: 'Pengumuman Berhasil Diperbarui' });
       } else {
         await api.post('/announcements', {
           title,
           content,
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
         });
-        toast({ title: '✅ Pengumuman baru berhasil diterbitkan' });
+        toast({ title: 'Pengumuman Baru Berhasil Diterbitkan' });
       }
       resetForm();
       fetchAnnouncements();
     } catch (e: any) {
-      toast({ title: 'Gagal menyimpan pengumuman', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Menyimpan Pengumuman',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -78,21 +98,31 @@ export default function Announcements() {
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     try {
       await api.patch(`/announcements/${id}`, { isActive: !currentStatus });
-      toast({ title: !currentStatus ? 'Pengumuman diaktifkan' : 'Pengumuman dinonaktifkan' });
+      toast({
+        title: !currentStatus ? 'Pengumuman berhasil diaktifkan' : 'Pengumuman dinonaktifkan',
+      });
       fetchAnnouncements();
     } catch (e: any) {
-      toast({ title: 'Gagal mengubah status', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Mengubah Status',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Nonaktifkan pengumuman ini?')) return;
+    if (!confirm('Nonaktifkan pengumuman ini secara permanen?')) return;
     try {
       await api.delete(`/announcements/${id}`);
-      toast({ title: 'Pengumuman dinonaktifkan' });
+      toast({ title: 'Pengumuman berhasil dinonaktifkan' });
       fetchAnnouncements();
     } catch (e: any) {
-      toast({ title: 'Gagal menghapus', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Menghapus',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -104,46 +134,64 @@ export default function Announcements() {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Kelola Pengumuman Publik</h1>
-        <p className="text-sm text-slate-500">
-          Publikasikan informasi jadwal operasional, pemeliharaan gedung, atau kebijakan baru ke beranda publik.
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div className="pb-4 border-b border-neutral-200">
+        <h1 className="text-2xl sm:text-3xl font-bold text-neutral-950">
+          Publikasi Pengumuman Resmi
+        </h1>
+        <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+          Kelola informasi pemeliharaan fasilitas, hari libur nasional, atau pengumuman tarif resmi.
         </p>
       </div>
 
       {/* Form Buat / Edit */}
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-slate-800">
-            {editingId ? '✏️ Edit Pengumuman' : '➕ Buat Pengumuman Baru'}
+      <Card className="border-neutral-200 shadow-xs rounded-lg bg-white">
+        <CardHeader className="pb-3 border-b border-neutral-200">
+          <CardTitle className="text-base font-bold text-neutral-950 flex items-center gap-2">
+            {editingId ? (
+              <>
+                <Pencil className="w-4 h-4 text-primary-700" />
+                <span>Perbarui Pengumuman</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4 text-primary-700" />
+                <span>Buat Pengumuman Baru</span>
+              </>
+            )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pengumuman *</label>
+              <label className="block text-xs font-bold text-neutral-800 mb-1">
+                Judul Pengumuman *
+              </label>
               <Input
-                placeholder="Contoh: Jadwal Penutupan Sementara Gedung BITC untuk Pemeliharaan"
+                placeholder="Contoh: Pemberitahuan Pemeliharaan Kelistrikan Gedung BITC"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Isi Pengumuman *</label>
+              <label className="block text-xs font-bold text-neutral-800 mb-1">
+                Isi Pengumuman *
+              </label>
               <textarea
-                className="w-full border rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-neutral-300 rounded-lg p-3 text-sm focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
                 rows={4}
-                placeholder="Tulis detail pengumuman yang ingin disampaikan kepada masyarakat dan pemohon..."
+                placeholder="Tuliskan isi informasi pengumuman resmi yang akan ditampilkan di beranda publik..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 required
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Batas Waktu Tayang (Opsional - Kosongkan jika berlaku permanen)
+              <label className="block text-xs font-bold text-neutral-800 mb-1">
+                Batas Waktu Tayang (Opsional — kosongkan jika berlaku permanen)
               </label>
               <Input
                 type="datetime-local"
@@ -152,14 +200,23 @@ export default function Announcements() {
                 onChange={(e) => setExpiresAt(e.target.value)}
               />
             </div>
-            <div className="flex gap-2 justify-end pt-2">
+
+            <div className="flex gap-2 justify-end pt-3 border-t border-neutral-100">
               {editingId && (
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button type="button" variant="outline" size="sm" onClick={resetForm} className="text-xs h-9">
                   Batal Edit
                 </Button>
               )}
-              <Button type="submit" disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
-                {submitting ? 'Menyimpan...' : editingId ? 'Simpan Perubahan' : 'Terbitkan Pengumuman'}
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="bg-primary-700 hover:bg-primary-900 text-white font-bold text-xs h-9 px-4"
+              >
+                {submitting
+                  ? 'Menyimpan...'
+                  : editingId
+                  ? 'Simpan Perubahan'
+                  : 'Terbitkan Pengumuman'}
               </Button>
             </div>
           </form>
@@ -167,63 +224,99 @@ export default function Announcements() {
       </Card>
 
       {/* Daftar Pengumuman */}
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-slate-800">Daftar Semua Pengumuman</CardTitle>
+      <Card className="border-neutral-200 shadow-xs rounded-lg bg-white">
+        <CardHeader className="pb-3 border-b border-neutral-200">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-base font-bold text-neutral-950">
+              Daftar Pengumuman Terbit
+            </CardTitle>
+            <span className="text-xs font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded">
+              {announcements.length} Pengumuman
+            </span>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {loading && <p className="text-sm text-slate-400">Memuat pengumuman...</p>}
+        <CardContent className="p-4 sm:p-6 space-y-3">
+          {loading && (
+            <p className="text-xs text-neutral-400 text-center py-6">Memuat pengumuman...</p>
+          )}
           {!loading && announcements.length === 0 && (
-            <p className="text-sm text-slate-500">Belum ada pengumuman yang dibuat.</p>
+            <p className="text-xs text-neutral-500 text-center py-6">Belum ada pengumuman yang dibuat.</p>
           )}
           {announcements.map((item) => (
             <div
               key={item.id}
-              className={`p-4 border rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition ${
-                item.isActive ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-200 opacity-60'
+              className={`p-4 border rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition ${
+                item.isActive
+                  ? 'bg-white border-neutral-200 shadow-2xs'
+                  : 'bg-neutral-50 border-neutral-200 opacity-60'
               }`}
             >
-              <div className="space-y-1 max-w-3xl">
+              <div className="space-y-1.5 max-w-3xl">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
-                      item.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
+                    className={`text-[11px] px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider border ${
+                      item.isActive
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                        : 'bg-neutral-200 text-neutral-700 border-neutral-300'
                     }`}
                   >
                     {item.isActive ? 'Aktif Tayang' : 'Nonaktif'}
                   </span>
-                  <span className="text-xs text-slate-400">
-                    Diterbitkan: {format(new Date(item.publishedAt), 'dd MMM yyyy HH:mm')}
+                  <span className="text-[11px] text-neutral-400">
+                    Diterbitkan: {format(new Date(item.publishedAt), 'd MMM yyyy HH:mm', { locale: idLocale })}
                   </span>
                   {item.expiresAt && (
-                    <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
-                      Berakhir: {format(new Date(item.expiresAt), 'dd MMM yyyy HH:mm')}
+                    <span className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium">
+                      Berakhir: {format(new Date(item.expiresAt), 'd MMM yyyy HH:mm', { locale: idLocale })}
                     </span>
                   )}
                 </div>
-                <h3 className="font-bold text-slate-900 text-base">{item.title}</h3>
-                <p className="text-sm text-slate-600 whitespace-pre-line">{item.content}</p>
+                <h3 className="font-bold text-neutral-950 text-sm sm:text-base">{item.title}</h3>
+                <p className="text-xs text-neutral-600 whitespace-pre-line leading-relaxed">
+                  {item.content}
+                </p>
               </div>
 
-              <div className="flex items-center gap-2 self-end md:self-center">
-                <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-                  ✏️ Edit
+              <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleEdit(item)}
+                  className="text-xs h-8 px-2.5"
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1 text-primary-700" />
+                  Edit
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  className={item.isActive ? 'text-amber-600 border-amber-300' : 'text-green-600 border-green-300'}
+                  className={`text-xs h-8 px-2.5 ${
+                    item.isActive
+                      ? 'text-amber-800 border-amber-300 hover:bg-amber-50'
+                      : 'text-emerald-800 border-emerald-300 hover:bg-emerald-50'
+                  }`}
                   onClick={() => handleToggleActive(item.id, item.isActive)}
                 >
-                  {item.isActive ? 'Sembunyikan' : 'Tayangkan'}
+                  {item.isActive ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 mr-1" />
+                      Sembunyikan
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5 mr-1" />
+                      Tayangkan
+                    </>
+                  )}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-red-500 hover:bg-red-50"
+                  className="text-red-600 hover:bg-red-50 h-8 w-8 p-0"
                   onClick={() => handleDelete(item.id)}
+                  title="Hapus Pengumuman"
                 >
-                  🗑️
+                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </div>

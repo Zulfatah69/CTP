@@ -4,26 +4,31 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { StatusTag } from '@/components/ui/StatusTag';
+import { NotificationBanner } from '@/components/ui/NotificationBanner';
 import { format } from 'date-fns';
-
-const STATE_LABELS: Record<string, { label: string; color: string }> = {
-  DRAFT:           { label: 'Draft', color: 'bg-gray-100 text-gray-600' },
-  SUBMITTED:       { label: 'Menunggu Review', color: 'bg-blue-100 text-blue-700' },
-  UNDER_REVIEW:    { label: 'Sedang Direview', color: 'bg-yellow-100 text-yellow-700' },
-  REVISION_NEEDED: { label: 'Perlu Perbaikan', color: 'bg-orange-100 text-orange-700' },
-  APPROVED:        { label: 'Disetujui', color: 'bg-green-100 text-green-700' },
-  WAITING_PAYMENT: { label: 'Menunggu Pembayaran', color: 'bg-purple-100 text-purple-700' },
-  ACTIVE:          { label: 'Aktif', color: 'bg-green-200 text-green-800' },
-  COMPLETED:       { label: 'Selesai', color: 'bg-gray-200 text-gray-700' },
-  CANCELLED:       { label: 'Dibatalkan', color: 'bg-red-100 text-red-600' },
-  REJECTED:        { label: 'Ditolak', color: 'bg-red-200 text-red-700' },
-};
+import { id } from 'date-fns/locale';
+import {
+  Search,
+  CheckCircle2,
+  FileText,
+  UserCheck,
+  Clock,
+  Building2,
+  Users,
+  Upload,
+  RefreshCw,
+  XCircle,
+  CreditCard,
+  Check,
+  X,
+} from 'lucide-react';
 
 const PIC_ROLES = [
   { value: 'MAIN_PIC', label: 'PIC Utama' },
   { value: 'VIDEOTRON_OPERATOR', label: 'Operator Videotron & Multimedia' },
   { value: 'CLEANING_STAFF', label: 'Petugas Kebersihan' },
-  { value: 'TECHNICIAN', label: 'Teknisi Audio Visual & Listrik' },
+  { value: 'TECHNICIAN', label: 'Teknisi Audio Visual & Kelistrikan' },
   { value: 'OTHER', label: 'Petugas Pendukung Lainnya' },
 ];
 
@@ -31,7 +36,8 @@ export default function AdminBookings() {
   const { toast } = useToast();
   const [bookings, setBookings] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
-  const [filter, setFilter] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   // Reschedule Modal state
   const [rescheduleBookingId, setRescheduleBookingId] = useState<string | null>(null);
@@ -73,11 +79,20 @@ export default function AdminBookings() {
       toast({ title: successMsg });
       fetchBookings();
     } catch (e: any) {
-      toast({ title: 'Gagal', description: e.response?.data?.message || 'Terjadi kesalahan', variant: 'destructive' });
+      toast({
+        title: 'Tindakan Gagal',
+        description: e.response?.data?.message || 'Terjadi kesalahan sistem.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const promptAction = async (endpoint: string, promptMsg: string, field: string, successMsg: string) => {
+  const promptAction = async (
+    endpoint: string,
+    promptMsg: string,
+    field: string,
+    successMsg: string
+  ) => {
     const val = prompt(promptMsg);
     if (!val) return;
     await action(endpoint, { [field]: val }, successMsg);
@@ -94,11 +109,20 @@ export default function AdminBookings() {
       fd.append('file', file);
       fd.append('type', 'LEMBAR_DISPOSISI');
       try {
-        await api.post(`/documents/booking/${bookingId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-        toast({ title: 'Disposisi diunggah. Sekarang Anda bisa menyetujui booking.' });
+        await api.post(`/documents/booking/${bookingId}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        toast({
+          title: 'Lembar Disposisi Berhasil Diunggah',
+          description: 'Anda sekarang dapat menyetujui booking ini.',
+        });
         fetchBookings();
       } catch (e: any) {
-        toast({ title: 'Gagal upload', description: e.response?.data?.message, variant: 'destructive' });
+        toast({
+          title: 'Gagal Mengunggah Disposisi',
+          description: e.response?.data?.message,
+          variant: 'destructive',
+        });
       }
     };
     input.click();
@@ -110,13 +134,13 @@ export default function AdminBookings() {
       const { data } = await api.get(`/documents/${doc.id}/download`);
       window.open(data.url + (data.url.includes('?') ? '&' : '?') + `token=${token}`, '_blank');
     } catch (e) {
-      toast({ title: 'Gagal mengunduh dokumen', variant: 'destructive' });
+      toast({ title: 'Gagal mengunduh berkas', variant: 'destructive' });
     }
   };
 
   const handleRescheduleSubmit = async () => {
     if (!newDateStart || !newDateEnd || !rescheduleReason) {
-      toast({ title: 'Lengkapi semua field reschedule', variant: 'destructive' });
+      toast({ title: 'Lengkapi semua parameter perubahan jadwal', variant: 'destructive' });
       return;
     }
 
@@ -124,94 +148,173 @@ export default function AdminBookings() {
       await api.post(`/bookings/${rescheduleBookingId}/reschedule`, {
         newDateStart,
         newDateEnd,
-        reason: rescheduleReason
+        reason: rescheduleReason,
       });
-      toast({ title: 'Reschedule Berhasil! 📅', description: 'Jadwal booking telah diperbarui.' });
+      toast({
+        title: 'Perubahan Jadwal Berhasil',
+        description: 'Jadwal booking telah diperbarui dalam sistem.',
+      });
       setRescheduleBookingId(null);
       setNewDateStart('');
       setNewDateEnd('');
       setRescheduleReason('');
       fetchBookings();
     } catch (e: any) {
-      toast({ title: 'Reschedule Gagal', description: e.response?.data?.message || 'Error', variant: 'destructive' });
+      toast({
+        title: 'Reschedule Gagal',
+        description: e.response?.data?.message || 'Terjadi kesalahan.',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleAssignPicSubmit = async () => {
     if (!selectedEmployee || !selectedRole) {
-      toast({ title: 'Pilih pegawai dan peran PIC', variant: 'destructive' });
+      toast({ title: 'Pilih nama pegawai dan peran PIC', variant: 'destructive' });
       return;
     }
 
     try {
       await api.post(`/bookings/${picBookingId}/pic`, {
         employeeId: selectedEmployee,
-        role: selectedRole
+        role: selectedRole,
       });
-      toast({ title: 'PIC Berhasil Ditugaskan! 👷' });
+      toast({ title: 'Petugas PIC Berhasil Ditugaskan' });
       setPicBookingId(null);
       setSelectedEmployee('');
       fetchBookings();
     } catch (e: any) {
-      toast({ title: 'Penugasan PIC Gagal', description: e.response?.data?.message || 'Error', variant: 'destructive' });
+      toast({
+        title: 'Penugasan Gagal',
+        description: e.response?.data?.message || 'Terjadi kesalahan.',
+        variant: 'destructive',
+      });
     }
   };
 
   const handleRemovePic = async (bookingId: string, assignmentId: string) => {
-    if (!confirm('Hapus penugasan PIC ini?')) return;
+    if (!confirm('Apakah Anda yakin ingin membatalkan penugasan PIC ini?')) return;
     try {
       await api.delete(`/bookings/${bookingId}/pic/${assignmentId}`);
       toast({ title: 'Penugasan PIC dihapus' });
       fetchBookings();
     } catch (e: any) {
-      toast({ title: 'Gagal menghapus PIC', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Menghapus PIC',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     }
   };
 
-  const filtered = bookings.filter(b =>
-    !filter || b.state === filter || b.bookingNumber.includes(filter) || b.eventName?.toLowerCase().includes(filter.toLowerCase())
-  );
+  const filtered = bookings.filter((b) => {
+    const matchesSearch =
+      !filterQuery ||
+      b.bookingNumber?.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      b.eventName?.toLowerCase().includes(filterQuery.toLowerCase()) ||
+      b.room?.name?.toLowerCase().includes(filterQuery.toLowerCase());
+    const matchesStatus = !statusFilter || b.state === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Header and Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200">
         <div>
-          <h1 className="text-3xl font-bold">Manajemen Booking</h1>
-          <p className="text-sm text-slate-500">Kelola antrean pengajuan, persetujuan, penugasan PIC, dan perubahan jadwal.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-950">
+            Manajemen Antrean Booking
+          </h1>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+            Verifikasi berkas fisik, validasi disposisi pimpinan, dan penugasan petugas PIC UPTD.
+          </p>
         </div>
-        <Input
-          placeholder="Filter status / nomor booking..."
-          className="max-w-xs"
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-        />
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Input
+              placeholder="Cari nomor booking / acara..."
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              className="h-10 pl-9 w-52 sm:w-64 text-xs"
+            />
+          </div>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-neutral-300 bg-white text-xs font-semibold focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
+          >
+            <option value="">Semua Status</option>
+            <option value="SUBMITTED">Menunggu Review</option>
+            <option value="UNDER_REVIEW">Sedang Direview</option>
+            <option value="REVISION_NEEDED">Perlu Perbaikan</option>
+            <option value="APPROVED">Disetujui</option>
+            <option value="WAITING_PAYMENT">Menunggu Bayar</option>
+            <option value="ACTIVE">Aktif</option>
+            <option value="COMPLETED">Selesai</option>
+            <option value="REJECTED">Ditolak</option>
+            <option value="CANCELLED">Dibatalkan</option>
+          </select>
+        </div>
       </div>
 
       {/* Modal Reschedule */}
       {rescheduleBookingId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold">Reschedule Booking Jadwal</h3>
-            <p className="text-xs text-slate-500">Maksimal 3x perubahan jadwal. Wajib dalam tahun kalender yang sama.</p>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-lg space-y-4 border border-neutral-200">
+            <div>
+              <h3 className="text-base font-bold text-neutral-950">Reschedule Tanggal Booking</h3>
+              <p className="text-xs text-neutral-500">
+                Sesuai BR-RESCHEDULE, maksimal 3x perubahan jadwal dalam tahun kalender berjalan.
+              </p>
+            </div>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700">Waktu Mulai Baru *</label>
-                <Input type="datetime-local" value={newDateStart} onChange={e => setNewDateStart(e.target.value)} />
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Waktu Mulai Baru *
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={newDateStart}
+                  onChange={(e) => setNewDateStart(e.target.value)}
+                />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-700">Waktu Selesai Baru *</label>
-                <Input type="datetime-local" value={newDateEnd} onChange={e => setNewDateEnd(e.target.value)} />
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Waktu Selesai Baru *
+                </label>
+                <Input
+                  type="datetime-local"
+                  value={newDateEnd}
+                  onChange={(e) => setNewDateEnd(e.target.value)}
+                />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-700">Alasan Perubahan Jadwal *</label>
-                <Input placeholder="Contoh: Permohonan pemohon via surat permohonan tanggal XX" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} />
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Alasan Perubahan Jadwal Resmi *
+                </label>
+                <Input
+                  placeholder="Contoh: Permohonan tertulis pemohon tanggal XX"
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setRescheduleBookingId(null)}>Batal</Button>
-              <Button onClick={handleRescheduleSubmit} className="bg-blue-600 hover:bg-blue-700">Simpan Jadwal Baru</Button>
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+              <Button variant="outline" size="sm" onClick={() => setRescheduleBookingId(null)}>
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleRescheduleSubmit}
+                className="bg-primary-700 hover:bg-primary-900 text-white"
+              >
+                Simpan Jadwal Baru
+              </Button>
             </div>
           </div>
         </div>
@@ -219,124 +322,185 @@ export default function AdminBookings() {
 
       {/* Modal PIC Assignment */}
       {picBookingId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold">Tugaskan Petugas PIC Ruangan</h3>
-            <p className="text-xs text-slate-500">Pilih pegawai internal UPTD CTP yang bertugas melayani kegiatan ini.</p>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-lg space-y-4 border border-neutral-200">
+            <div>
+              <h3 className="text-base font-bold text-neutral-950">
+                Tugaskan Petugas PIC Fasilitas
+              </h3>
+              <p className="text-xs text-neutral-500">
+                Pilih pegawai internal UPTD CTP yang bertugas melayani teknis kegiatan ini.
+              </p>
+            </div>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700">Pilih Pegawai *</label>
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Pilih Pegawai Bertugas *
+                </label>
                 <select
-                  className="w-full h-10 px-3 rounded-md border text-sm"
+                  className="w-full h-11 px-3 rounded-lg border border-neutral-300 text-xs font-medium"
                   value={selectedEmployee}
-                  onChange={e => setSelectedEmployee(e.target.value)}
+                  onChange={(e) => setSelectedEmployee(e.target.value)}
                 >
                   <option value="">-- Pilih Pegawai --</option>
-                  {employees.map(emp => (
+                  {employees.map((emp) => (
                     <option key={emp.id} value={emp.id}>
                       {emp.fullName} ({emp.position})
                     </option>
                   ))}
                 </select>
               </div>
+
               <div>
-                <label className="text-xs font-semibold text-slate-700">Peran / Tugas PIC *</label>
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Peran / Tanggung Jawab PIC *
+                </label>
                 <select
-                  className="w-full h-10 px-3 rounded-md border text-sm"
+                  className="w-full h-11 px-3 rounded-lg border border-neutral-300 text-xs font-medium"
                   value={selectedRole}
-                  onChange={e => setSelectedRole(e.target.value)}
+                  onChange={(e) => setSelectedRole(e.target.value)}
                 >
-                  {PIC_ROLES.map(r => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                  {PIC_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setPicBookingId(null)}>Batal</Button>
-              <Button onClick={handleAssignPicSubmit} className="bg-emerald-600 hover:bg-emerald-700">Tugaskan PIC</Button>
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+              <Button variant="outline" size="sm" onClick={() => setPicBookingId(null)}>
+                Batal
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAssignPicSubmit}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white"
+              >
+                Tugaskan PIC
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {filtered.length === 0 && <p className="text-gray-500">Tidak ada data booking yang sesuai.</p>}
+      {/* Booking List */}
+      {filtered.length === 0 && (
+        <div className="p-12 text-center text-xs text-neutral-500 bg-white border border-neutral-200 rounded-lg">
+          Tidak ada data booking yang sesuai dengan kriteria filter.
+        </div>
+      )}
 
       {filtered.map((b: any) => {
-        const stateInfo = STATE_LABELS[b.state] || { label: b.state, color: 'bg-gray-100 text-gray-600' };
         const hasDisposisi = b.documents?.some((d: any) => d.type === 'LEMBAR_DISPOSISI');
+        const isNonGov = ['KOMUNITAS', 'PERSONAL'].includes(b.applicantCategory);
 
         return (
-          <Card key={b.id} className="border-slate-200 shadow-sm">
-            <CardContent className="p-5 space-y-4">
+          <Card key={b.id} className="border-neutral-200 shadow-2xs rounded-lg bg-white">
+            <CardContent className="p-5 sm:p-6 space-y-4">
               {/* Header Info */}
-              <div className="flex justify-between items-start">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <div className="flex gap-2 items-center">
-                    <span className="font-bold text-lg text-slate-900">{b.bookingNumber}</span>
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${stateInfo.color}`}>{stateInfo.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-base text-neutral-950">
+                      {b.bookingNumber}
+                    </span>
+                    <StatusTag status={b.state} />
                     {b.rescheduleCount > 0 && (
-                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
-                        🔄 Reschedule ({b.rescheduleCount}x)
+                      <span className="text-[11px] bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded font-semibold">
+                        Reschedule {b.rescheduleCount}x
                       </span>
                     )}
                   </div>
-                  <p className="text-base font-medium text-slate-800 mt-1">{b.eventName}</p>
-                  <p className="text-xs text-slate-500">
-                    🏢 {b.room?.name} ({b.room?.building?.name}) &nbsp;|&nbsp; 
-                    📅 {format(new Date(b.dateStart), 'dd MMM yyyy HH:mm')} – {format(new Date(b.dateEnd), 'HH:mm')} &nbsp;|&nbsp; 
-                    👥 {b.participantCount} peserta
-                  </p>
+                  <h3 className="text-base font-bold text-neutral-900 mt-1">{b.eventName}</h3>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-600 mt-1">
+                    <span className="flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5 text-neutral-400" />
+                      {b.room?.name} ({b.room?.building?.name})
+                    </span>
+                    <span>&bull;</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                      {format(new Date(b.dateStart), 'd MMM yyyy HH:mm', { locale: id })} –{' '}
+                      {format(new Date(b.dateEnd), 'HH:mm')} WIB
+                    </span>
+                    <span>&bull;</span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-neutral-400" />
+                      {b.participantCount} peserta
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Revision note */}
+              {/* BR-BOOKING-005 Internal Warning Banner */}
+              {isNonGov && (
+                <NotificationBanner
+                  type="warning"
+                  title="Peringatan Regulasi Internal (BR-BOOKING-005)"
+                >
+                  Pemohon memilih kategori non-pemerintah ({b.applicantCategory}). Pastikan terdapat dasar
+                  atau arahan pimpinan yang terdokumentasi sebelum persetujuan resmi diberikan.
+                </NotificationBanner>
+              )}
+
+              {/* Revision note banner */}
               {b.state === 'REVISION_NEEDED' && b.revisionNote && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-2.5 text-xs text-orange-800">
-                  <p className="font-semibold">Catatan perbaikan yang dikirim ke pemohon:</p>
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900 space-y-1">
+                  <span className="font-bold block">Catatan Perbaikan Terkirim:</span>
                   <p>{b.revisionNote}</p>
                 </div>
               )}
 
-              {/* BR-BOOKING-005: Banner internal untuk kategori non-pemerintah */}
-              {['KOMUNITAS', 'PERSONAL'].includes(b.applicantCategory) && (
-                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-2.5 text-xs text-yellow-900 flex items-start gap-2">
-                  <span className="text-base">⚠️</span>
-                  <div>
-                    <p className="font-bold">Perhatian Internal: Kategori Pemohon — {b.applicantCategory === 'KOMUNITAS' ? 'Komunitas/Ormas/LSM' : 'Perorangan/Lainnya'}</p>
-                    <p className="mt-0.5 text-yellow-800">Pastikan terdapat dasar/arahan pimpinan yang terdokumentasi sesuai ketentuan regulasi sebelum disetujui (BR-BOOKING-005).</p>
+              {/* Digital Dossier Document Chips (No deletion button per BR-DOSSIER) */}
+              {b.documents?.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide block">
+                    Berkas Digital Dossier:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {b.documents.map((d: any) => (
+                      <Button
+                        key={d.id}
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 bg-neutral-50 border-neutral-300 hover:bg-neutral-100"
+                        onClick={() => handleDownloadDoc(d)}
+                      >
+                        <FileText className="w-3.5 h-3.5 mr-1 text-primary-700" />
+                        <span>
+                          {d.type === 'LEMBAR_DISPOSISI' ? 'Disposisi Pimpinan' : d.type}: {d.originalName}
+                        </span>
+                      </Button>
+                    ))}
                   </div>
                 </div>
               )}
 
-
-              {/* Dossier Dokumen */}
-              {b.documents?.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {b.documents.map((d: any) => (
-                    <Button key={d.id} variant="outline" size="sm" className="text-xs bg-slate-50" onClick={() => handleDownloadDoc(d)}>
-                      📎 {d.type} — {d.originalName}
-                    </Button>
-                  ))}
-                </div>
-              )}
-
-              {/* PIC List (Jika ada) */}
+              {/* Assigned PICs */}
               {b.picAssignments?.length > 0 && (
-                <div className="bg-slate-50 border rounded-lg p-2.5 text-xs space-y-1">
-                  <span className="font-semibold text-slate-700">👷 PIC Bertugas:</span>
-                  <div className="flex flex-wrap gap-2 mt-1">
+                <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-lg text-xs space-y-1.5">
+                  <span className="font-bold text-neutral-800 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-emerald-700" />
+                    Petugas PIC Lapangan:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
                     {b.picAssignments.map((pic: any) => (
-                      <span key={pic.id} className="inline-flex items-center gap-1.5 bg-white border px-2 py-1 rounded shadow-xs">
-                        <b>{pic.role}:</b> {pic.employee?.fullName || 'Petugas'}
+                      <span
+                        key={pic.id}
+                        className="inline-flex items-center gap-1.5 bg-white border border-neutral-300 px-2.5 py-1 rounded text-xs font-medium shadow-2xs"
+                      >
+                        <b className="text-neutral-900">{pic.role}:</b>
+                        <span className="text-neutral-700">{pic.employee?.fullName || 'Petugas'}</span>
                         <button
+                          type="button"
                           onClick={() => handleRemovePic(b.id, pic.id)}
-                          className="text-red-500 hover:text-red-700 ml-1 font-bold"
-                          title="Hapus PIC"
+                          className="text-neutral-400 hover:text-red-700 ml-1 p-0.5 rounded transition-colors"
+                          title="Hapus Penugasan PIC"
                         >
-                          ×
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </span>
                     ))}
@@ -344,33 +508,74 @@ export default function AdminBookings() {
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-2 pt-2 border-t items-center">
+              {/* Action Toolbar */}
+              <div className="flex flex-wrap gap-2 pt-3 border-t border-neutral-200 items-center">
                 {/* SUBMITTED → UNDER_REVIEW */}
                 {b.state === 'SUBMITTED' && (
-                  <Button size="sm" onClick={() => action(`/bookings/${b.id}/review`, {}, 'Status berubah ke UNDER_REVIEW')}>
-                    🔍 Buka Review
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      action(`/bookings/${b.id}/review`, {}, 'Status berubah ke UNDER_REVIEW')
+                    }
+                    className="bg-primary-700 hover:bg-primary-900 text-white text-xs h-9"
+                  >
+                    Buka Review Berkas
                   </Button>
                 )}
 
                 {/* UNDER_REVIEW actions */}
                 {b.state === 'UNDER_REVIEW' && (
                   <>
-                    <Button size="sm" variant="outline" className="text-orange-600 border-orange-400"
-                      onClick={() => promptAction(`/bookings/${b.id}/request-revision`, 'Masukkan catatan perbaikan untuk pemohon:', 'note', 'Permintaan perbaikan dikirim')}>
-                      ✏️ Minta Perbaikan
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-amber-800 border-amber-400 hover:bg-amber-50 text-xs h-9"
+                      onClick={() =>
+                        promptAction(
+                          `/bookings/${b.id}/request-revision`,
+                          'Masukkan catatan perbaikan berkas untuk pemohon:',
+                          'note',
+                          'Permintaan perbaikan berhasil dikirim ke pemohon'
+                        )
+                      }
+                    >
+                      Minta Perbaikan
                     </Button>
-                    <Button size="sm" variant="outline" className="text-red-600 border-red-400"
-                      onClick={() => promptAction(`/bookings/${b.id}/reject`, 'Masukkan alasan penolakan:', 'reason', 'Booking ditolak')}>
-                      ❌ Tolak
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-700 border-red-300 hover:bg-red-50 text-xs h-9"
+                      onClick={() =>
+                        promptAction(
+                          `/bookings/${b.id}/reject`,
+                          'Masukkan alasan penolakan permohonan:',
+                          'reason',
+                          'Permohonan booking resmi ditolak'
+                        )
+                      }
+                    >
+                      Tolak
                     </Button>
-                    <Button size="sm" variant="outline" className="text-blue-600 border-blue-400" onClick={() => handleUploadDisposisi(b.id)}>
-                      📤 Upload Disposisi {hasDisposisi && '✓'}
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-primary-700 border-primary-400 hover:bg-primary-50 text-xs h-9"
+                      onClick={() => handleUploadDisposisi(b.id)}
+                    >
+                      <Upload className="w-3.5 h-3.5 mr-1" />
+                      Upload Disposisi {hasDisposisi && <Check className="w-3.5 h-3.5 text-emerald-600 inline ml-1 stroke-[2.5]" />}
                     </Button>
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700"
-                      onClick={() => action(`/bookings/${b.id}/approve`, {}, 'Booking disetujui!')}
-                      title={!hasDisposisi ? 'Upload disposisi terlebih dahulu' : ''}>
-                      ✅ Setujui {!hasDisposisi && '(butuh disposisi)'}
+
+                    <Button
+                      size="sm"
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-9 font-bold"
+                      onClick={() => action(`/bookings/${b.id}/approve`, {}, 'Permohonan berhasil disetujui!')}
+                      title={!hasDisposisi ? 'Upload lembar disposisi terlebih dahulu' : ''}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                      Setujui {!hasDisposisi && '(Wajib Disposisi)'}
                     </Button>
                   </>
                 )}
@@ -378,65 +583,105 @@ export default function AdminBookings() {
                 {/* WAITING_PAYMENT actions */}
                 {b.state === 'WAITING_PAYMENT' && (
                   <>
-                    {b.payment?.state === 'PROOF_UPLOADED' && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
-                        Bukti bayar siap diverifikasi
-                      </span>
-                    )}
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700"
-                      onClick={() => { if (confirm('Konfirmasi verifikasi pembayaran manual?')) action(`/payments/${b.id}/verify`, {}, 'Pembayaran terverifikasi! Booking ACTIVE'); }}>
-                      💰 Verifikasi Pembayaran
+                    <Button
+                      size="sm"
+                      className="bg-primary-700 hover:bg-primary-900 text-white text-xs h-9 font-bold"
+                      onClick={() => {
+                        if (confirm('Konfirmasi verifikasi pembayaran retribusi resmi?'))
+                          action(`/payments/${b.id}/verify`, {}, 'Pembayaran terverifikasi! Status booking AKTIF.');
+                      }}
+                    >
+                      <CreditCard className="w-3.5 h-3.5 mr-1" />
+                      Verifikasi Pembayaran
                     </Button>
                     {b.payment?.state === 'PROOF_UPLOADED' && (
-                      <Button size="sm" variant="outline" className="text-red-600 border-red-400"
-                        onClick={() => promptAction(`/payments/${b.id}/reject-proof`, 'Masukkan alasan penolakan bukti:', 'reason', 'Bukti pembayaran ditolak')}>
-                        ❌ Tolak Bukti
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-700 border-red-300 hover:bg-red-50 text-xs h-9"
+                        onClick={() =>
+                          promptAction(
+                            `/payments/${b.id}/reject-proof`,
+                            'Masukkan alasan penolakan bukti transfer:',
+                            'reason',
+                            'Bukti pembayaran ditolak'
+                          )
+                        }
+                      >
+                        Tolak Bukti
                       </Button>
                     )}
                   </>
                 )}
 
-                {/* ACTIVE → COMPLETED */}
+                {/* ACTIVE → COMPLETED (Check-out) */}
                 {b.state === 'ACTIVE' && (
-                  <Button size="sm" className="bg-gray-700 hover:bg-gray-800"
-                    onClick={() => { if (confirm('Konfirmasi checkout? Kegiatan telah selesai?')) action(`/bookings/${b.id}/checkout`, {}, 'Checkout berhasil! Pemohon diminta mengisi SKM.'); }}>
-                    🏁 Selesai (Checkout)
+                  <Button
+                    size="sm"
+                    className="bg-neutral-900 hover:bg-black text-white text-xs h-9 font-bold"
+                    onClick={() => {
+                      if (confirm('Konfirmasi kegiatan selesai dan lakukan check-out?'))
+                        action(
+                          `/bookings/${b.id}/checkout`,
+                          {},
+                          'Kegiatan selesai! Pemohon diundang mengisi survei SKM.'
+                        );
+                    }}
+                  >
+                    Check-out Selesai
                   </Button>
                 )}
 
-                {/* Tombol Tugaskan PIC */}
+                {/* Tugaskan PIC button */}
                 {['APPROVED', 'WAITING_PAYMENT', 'ACTIVE'].includes(b.state) && (
                   <Button
                     size="sm"
                     variant="outline"
-                    className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                    className="text-emerald-800 border-emerald-300 hover:bg-emerald-50 text-xs h-9"
                     onClick={() => setPicBookingId(b.id)}
                   >
-                    👷 Tugaskan PIC
+                    <UserCheck className="w-3.5 h-3.5 mr-1" />
+                    Tugaskan PIC
                   </Button>
                 )}
 
-                {/* Tombol Reschedule */}
-                {['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'WAITING_PAYMENT', 'ACTIVE'].includes(b.state) && b.rescheduleCount < 3 && (
+                {/* Reschedule button */}
+                {['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'WAITING_PAYMENT', 'ACTIVE'].includes(
+                  b.state
+                ) &&
+                  b.rescheduleCount < 3 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-primary-700 border-primary-300 hover:bg-primary-50 text-xs h-9"
+                      onClick={() => {
+                        setRescheduleBookingId(b.id);
+                        setNewDateStart(b.dateStart.slice(0, 16));
+                        setNewDateEnd(b.dateEnd.slice(0, 16));
+                      }}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                      Reschedule
+                    </Button>
+                  )}
+
+                {/* Cancellation button (Admin-only BR-BOOKING-006) */}
+                {!['COMPLETED', 'CANCELLED', 'REJECTED'].includes(b.state) && (
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="text-indigo-600 border-indigo-300 hover:bg-indigo-50"
-                    onClick={() => {
-                      setRescheduleBookingId(b.id);
-                      setNewDateStart(b.dateStart.slice(0, 16));
-                      setNewDateEnd(b.dateEnd.slice(0, 16));
-                    }}
+                    variant="ghost"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 text-xs h-9 ml-auto"
+                    onClick={() =>
+                      promptAction(
+                        `/bookings/${b.id}/cancel`,
+                        'Masukkan alasan pembatalan resmi permohonan:',
+                        'reason',
+                        'Permohonan booking berhasil dibatalkan secara resmi'
+                      )
+                    }
                   >
-                    🔄 Reschedule
-                  </Button>
-                )}
-
-                {/* Batalkan */}
-                {!['COMPLETED', 'CANCELLED', 'REJECTED'].includes(b.state) && (
-                  <Button size="sm" variant="ghost" className="text-red-500 ml-auto hover:bg-red-50"
-                    onClick={() => promptAction(`/bookings/${b.id}/cancel`, 'Masukkan alasan pembatalan resmi:', 'reason', 'Booking dibatalkan')}>
-                    🚫 Batalkan
+                    <XCircle className="w-3.5 h-3.5 mr-1" />
+                    Batalkan Booking
                   </Button>
                 )}
               </div>

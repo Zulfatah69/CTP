@@ -4,32 +4,36 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { StatusTag } from '@/components/ui/StatusTag';
+import { NotificationBanner } from '@/components/ui/NotificationBanner';
+import { SummaryList, type SummaryListItem } from '@/components/ui/SummaryList';
+import { ConfirmationPanel } from '@/components/ui/ConfirmationPanel';
+import { CalComSplitPane } from '@/components/booking/CalComSplitPane';
 import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import {
+  Building2,
+  Calendar,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  CreditCard,
+  Star,
+  Users,
+} from 'lucide-react';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const APPLICANT_CATEGORIES = [
   { value: 'PEMERINTAH_PUSAT', label: 'Pemerintah Pusat' },
   { value: 'PEMERINTAH_DAERAH', label: 'Pemerintah Daerah / OPD' },
   { value: 'PEMERINTAH_CIMAHI', label: 'Pemerintah Kota Cimahi' },
-  { value: 'SWASTA', label: 'Swasta / Perusahaan' },
-  { value: 'PENDIDIKAN', label: 'Lembaga Pendidikan' },
-  { value: 'KOMUNITAS', label: 'Komunitas / Ormas / LSM' },
-  { value: 'PERSONAL', label: 'Perorangan / Lainnya' },
+  { value: 'SWASTA', label: 'Swasta / Pelaku Bisnis' },
+  { value: 'PENDIDIKAN', label: 'Lembaga Pendidikan (Kampus / Sekolah)' },
+  { value: 'KOMUNITAS', label: 'Komunitas / Ormas / Asosiasi' },
+  { value: 'PERSONAL', label: 'Perorangan / Personal' },
 ];
-
-const STATE_LABELS: Record<string, { label: string; color: string }> = {
-  DRAFT:           { label: 'Draft', color: 'bg-gray-100 text-gray-600' },
-  SUBMITTED:       { label: 'Diajukan', color: 'bg-blue-100 text-blue-700' },
-  UNDER_REVIEW:    { label: 'Sedang Direview', color: 'bg-yellow-100 text-yellow-700' },
-  REVISION_NEEDED: { label: 'Perlu Perbaikan', color: 'bg-orange-100 text-orange-700' },
-  APPROVED:        { label: 'Disetujui', color: 'bg-green-100 text-green-700' },
-  WAITING_PAYMENT: { label: 'Menunggu Pembayaran', color: 'bg-purple-100 text-purple-700' },
-  ACTIVE:          { label: 'Aktif', color: 'bg-green-200 text-green-800' },
-  COMPLETED:       { label: 'Selesai', color: 'bg-gray-200 text-gray-700' },
-  CANCELLED:       { label: 'Dibatalkan', color: 'bg-red-100 text-red-600' },
-  REJECTED:        { label: 'Ditolak', color: 'bg-red-200 text-red-700' },
-};
 
 export default function BookingForm() {
   const { toast } = useToast();
@@ -38,19 +42,32 @@ export default function BookingForm() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [myBookings, setMyBookings] = useState<any[]>([]);
 
-  // Form state
+  // Form selections
   const [selectedBuilding, setSelectedBuilding] = useState('');
+  const [selectedRoom, setSelectedRoom] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
   const [dateStart, setDateStart] = useState('');
   const [dateEnd, setDateEnd] = useState('');
-  const [selectedRoom, setSelectedRoom] = useState('');
+
+  // Step 2 formData
   const [formData, setFormData] = useState({
-    eventName: '', participantCount: '', attendeesDescription: '',
-    activityPurpose: '', activityDescription: '', applicantCategory: ''
+    eventName: '',
+    participantCount: '',
+    attendeesDescription: '',
+    activityPurpose: '',
+    activityDescription: '',
+    applicantCategory: '',
   });
+
+  // Step 3 files
   const [suratFile, setSuratFile] = useState<File | null>(null);
   const [proposalFile, setProposalFile] = useState<File | null>(null);
-  const [draftBookingId, setDraftBookingId] = useState('');
+  const [declarationChecked, setDeclarationChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Success state reference
+  const [confirmedBookingNumber, setConfirmedBookingNumber] = useState<string | null>(null);
 
   // SKM Modal state
   const [skmBookingId, setSkmBookingId] = useState<string | null>(null);
@@ -64,60 +81,126 @@ export default function BookingForm() {
   }, []);
 
   const fetchBuildings = async () => {
-    const { data } = await api.get('/master/buildings');
-    setBuildings(data);
+    try {
+      const { data } = await api.get('/master/buildings');
+      setBuildings(data);
+    } catch (e) {
+      console.error('Failed to fetch buildings');
+    }
   };
 
   const fetchMyBookings = async () => {
-    const { data } = await api.get('/bookings');
-    setMyBookings(data);
+    try {
+      const { data } = await api.get('/bookings');
+      setMyBookings(data);
+    } catch (e) {
+      console.error('Failed to fetch bookings');
+    }
   };
 
-  const fetchRooms = async () => {
-    if (!selectedBuilding || !dateStart || !dateEnd) return;
-    const { data } = await api.get('/master/rooms', { params: { buildingId: selectedBuilding, dateStart, dateEnd } });
-    setRooms(data);
+  // Fetch rooms for the selected building
+  useEffect(() => {
+    if (!selectedBuilding) {
+      setRooms([]);
+      setSelectedRoom('');
+      return;
+    }
+    const b = buildings.find((b) => b.id === selectedBuilding);
+    if (b && b.rooms) {
+      setRooms(b.rooms);
+    }
+  }, [selectedBuilding, buildings]);
+
+  // Handle slot confirmation from Cal.com component
+  const handleSlotConfirmed = () => {
+    if (!selectedDate || !selectedSlot) return;
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const startIso = `${dateStr}T${selectedSlot.start}:00`;
+    const endIso = `${dateStr}T${selectedSlot.end}:00`;
+    setDateStart(startIso);
+    setDateEnd(endIso);
   };
 
-  // Step 1 → 2
-  const goToStep2 = async () => {
-    if (!selectedBuilding || !dateStart || !dateEnd || !selectedRoom) {
-      toast({ title: 'Lengkapi pilihan gedung, tanggal, dan ruangan', variant: 'destructive' });
+  // Step 1 → Step 2 validation
+  const handleProceedToStep2 = () => {
+    if (!selectedBuilding || !selectedRoom) {
+      toast({
+        title: 'Pilih Ruangan',
+        description: 'Silakan pilih gedung dan ruangan terlebih dahulu.',
+        variant: 'destructive',
+      });
       return;
     }
-    if (new Date(dateEnd) <= new Date(dateStart)) {
-      toast({ title: 'Waktu selesai harus setelah waktu mulai', variant: 'destructive' });
+    if (!selectedDate || !selectedSlot) {
+      toast({
+        title: 'Pilih Tanggal & Waktu',
+        description: 'Silakan pilih tanggal dan slot jam pada kalender.',
+        variant: 'destructive',
+      });
       return;
     }
+    handleSlotConfirmed();
     setStep(2);
   };
 
-  // Step 2 → 3
-  const goToStep3 = () => {
-    if (!formData.eventName || !formData.participantCount || !formData.applicantCategory) {
-      toast({ title: 'Isi semua field yang wajib (*)', variant: 'destructive' });
+  // Step 2 → Step 3 validation
+  const handleProceedToStep3 = () => {
+    if (!formData.eventName.trim()) {
+      toast({ title: 'Nama Kegiatan Wajib Diisi', variant: 'destructive' });
+      return;
+    }
+    if (!formData.participantCount || Number(formData.participantCount) <= 0) {
+      toast({ title: 'Jumlah Peserta Wajib Diisi', variant: 'destructive' });
+      return;
+    }
+    if (!formData.applicantCategory) {
+      toast({ title: 'Kategori Pemohon Wajib Dipilih', variant: 'destructive' });
+      return;
+    }
+
+    const room = rooms.find((r) => r.id === selectedRoom);
+    if (room && room.capacity && Number(formData.participantCount) > room.capacity) {
+      toast({
+        title: 'Kapasitas Melebihi Batas',
+        description: `Jumlah peserta (${formData.participantCount}) melebihi daya tampung ruangan (${room.capacity} orang).`,
+        variant: 'destructive',
+      });
       return;
     }
     setStep(3);
   };
 
-  // Step 3 → 4 (Preview)
-  const goToStep4 = () => {
+  // Step 3 → Step 4 validation
+  const handleProceedToStep4 = () => {
     if (!suratFile) {
-      toast({ title: 'Surat permohonan wajib diunggah', variant: 'destructive' });
+      toast({
+        title: 'Surat Permohonan Wajib Diunggah',
+        description: 'Unggah surat permohonan resmi berstempel basah atau TTE.',
+        variant: 'destructive',
+      });
       return;
     }
     setStep(4);
   };
 
-  // Step 4: Submit (Create DRAFT → Upload Doc → Submit)
+  // Step 4: Final Submit
   const handleSubmit = async () => {
+    if (!declarationChecked) {
+      toast({
+        title: 'Pernyataan Belum Dicentang',
+        description: 'Harap centang pernyataan kebenaran data sebelum mengirim.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       // 1. Buat booking DRAFT
       const { data: booking } = await api.post('/bookings', {
         roomId: selectedRoom,
-        dateStart, dateEnd,
+        dateStart,
+        dateEnd,
         eventName: formData.eventName,
         participantCount: parseInt(formData.participantCount),
         attendeesDescription: formData.attendeesDescription,
@@ -130,61 +213,72 @@ export default function BookingForm() {
       const fd = new FormData();
       fd.append('file', suratFile!);
       fd.append('type', 'SURAT_PERMOHONAN');
-      await api.post(`/documents/booking/${booking.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await api.post(`/documents/booking/${booking.id}`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
 
-      // 3. Upload proposal (opsional)
+      // 3. Upload proposal jika ada
       if (proposalFile) {
         const fd2 = new FormData();
         fd2.append('file', proposalFile);
         fd2.append('type', 'PROPOSAL');
-        await api.post(`/documents/booking/${booking.id}`, fd2, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await api.post(`/documents/booking/${booking.id}`, fd2, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
       }
 
-      // 4. Submit (DRAFT → SUBMITTED)
+      // 4. Submit booking
       await api.post(`/bookings/${booking.id}/submit`);
 
-      toast({ title: '✅ Pengajuan berhasil dikirim!', description: `No. ${booking.bookingNumber} sedang diproses Admin.` });
-      
-      // Reset form
-      setStep(1);
-      setSelectedBuilding(''); setDateStart(''); setDateEnd(''); setSelectedRoom('');
-      setFormData({ eventName: '', participantCount: '', attendeesDescription: '', activityPurpose: '', activityDescription: '', applicantCategory: '' });
-      setSuratFile(null); setProposalFile(null);
-      fetchMyBookings();
+      setConfirmedBookingNumber(booking.bookingNumber);
+      setStep(5);
 
+      // Reset form fields
+      setSelectedBuilding('');
+      setSelectedRoom('');
+      setSelectedSlot(null);
+      setFormData({
+        eventName: '',
+        participantCount: '',
+        attendeesDescription: '',
+        activityPurpose: '',
+        activityDescription: '',
+        applicantCategory: '',
+      });
+      setSuratFile(null);
+      setProposalFile(null);
+      setDeclarationChecked(false);
+      fetchMyBookings();
     } catch (e: any) {
-      toast({ title: 'Gagal mengajukan', description: e.response?.data?.message || e.message, variant: 'destructive' });
+      toast({
+        title: 'Pengajuan Gagal',
+        description: e.response?.data?.message || 'Terjadi kesalahan saat memproses permohonan.',
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Upload bukti bayar untuk booking yang WAITING_PAYMENT
+  // Upload bukti bayar
   const handleUploadBukti = async (bookingId: string, file: File) => {
     const fd = new FormData();
     fd.append('file', file);
     try {
-      await api.post(`/payments/${bookingId}/upload-proof`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      toast({ title: 'Bukti pembayaran diunggah, menunggu verifikasi Admin' });
+      await api.post(`/payments/${bookingId}/upload-proof`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast({
+        title: 'Bukti Berhasil Diunggah',
+        description: 'Menunggu proses verifikasi manual oleh petugas Admin UPTD.',
+      });
       fetchMyBookings();
     } catch (e: any) {
-      toast({ title: 'Gagal upload', description: e.response?.data?.message, variant: 'destructive' });
-    }
-  };
-
-  // Resubmit setelah perbaikan
-  const handleResubmit = async (bookingId: string, file: File | null) => {
-    if (!file) { toast({ title: 'Upload surat permohonan terbaru', variant: 'destructive' }); return; }
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('type', 'SURAT_PERMOHONAN');
-    try {
-      await api.post(`/documents/booking/${bookingId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      await api.post(`/bookings/${bookingId}/submit`);
-      toast({ title: 'Pengajuan berhasil dikirim ulang' });
-      fetchMyBookings();
-    } catch (e: any) {
-      toast({ title: 'Gagal resubmit', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Mengunggah',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -195,306 +289,678 @@ export default function BookingForm() {
     try {
       await api.post(`/skm/${skmBookingId}`, {
         rating: Number(skmRating),
-        comment: skmComment
+        comment: skmComment,
       });
-      toast({ title: 'Terima kasih! ⭐', description: 'Survei Kepuasan Masyarakat berhasil dikirim.' });
+      toast({
+        title: 'Ulasan Diterima',
+        description: 'Terima kasih atas partisipasi Anda dalam survei kepuasan layanan UPTD.',
+      });
       setSkmBookingId(null);
       setSkmComment('');
       fetchMyBookings();
     } catch (e: any) {
-      toast({ title: 'Gagal mengirim survei', description: e.response?.data?.message, variant: 'destructive' });
+      toast({
+        title: 'Gagal Mengirim Survei',
+        description: e.response?.data?.message,
+        variant: 'destructive',
+      });
     } finally {
       setSubmittingSkm(false);
     }
   };
 
-  const selectedRoomData = rooms.find(r => r.id === selectedRoom);
+  const selectedBuildingData = buildings.find((b) => b.id === selectedBuilding);
+  const selectedRoomData = rooms.find((r) => r.id === selectedRoom);
+
+  // Summary list items for Step 4
+  const summaryItems: SummaryListItem[] = [
+    {
+      key: 'Gedung',
+      value: selectedBuildingData?.name,
+      onAction: () => setStep(1),
+    },
+    {
+      key: 'Ruangan',
+      value: selectedRoomData?.name,
+      onAction: () => setStep(1),
+    },
+    {
+      key: 'Tanggal Kegiatan',
+      value: selectedDate ? format(selectedDate, 'EEEE, d MMMM yyyy', { locale: id }) : '',
+      onAction: () => setStep(1),
+    },
+    {
+      key: 'Waktu / Jam',
+      value: selectedSlot ? `${selectedSlot.start} - ${selectedSlot.end} WIB` : '',
+      onAction: () => setStep(1),
+    },
+    {
+      key: 'Nama Kegiatan',
+      value: formData.eventName,
+      onAction: () => setStep(2),
+    },
+    {
+      key: 'Jumlah Peserta',
+      value: `${formData.participantCount} orang ${
+        formData.attendeesDescription ? `(${formData.attendeesDescription})` : ''
+      }`,
+      onAction: () => setStep(2),
+    },
+    {
+      key: 'Kategori Pemohon',
+      value: APPLICANT_CATEGORIES.find((c) => c.value === formData.applicantCategory)?.label,
+      onAction: () => setStep(2),
+    },
+    {
+      key: 'Surat Permohonan',
+      value: (
+        <span className="inline-flex items-center gap-1.5 text-emerald-800 font-medium">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          {suratFile?.name}
+        </span>
+      ),
+      onAction: () => setStep(3),
+    },
+    {
+      key: 'Proposal Kegiatan',
+      value: proposalFile ? proposalFile.name : 'Tidak dilampirkan (opsional)',
+      onAction: () => setStep(3),
+    },
+  ];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Modal SKM */}
+    <div className="space-y-8">
+      {/* ── SKM Modal Dialog ── */}
       {skmBookingId && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="text-center space-y-1">
-              <span className="text-3xl">⭐</span>
-              <h3 className="text-xl font-bold text-slate-800">Survei Kepuasan Masyarakat (SKM)</h3>
-              <p className="text-xs text-slate-500">Bantu kami meningkatkan kualitas layanan fasilitas UPTD Cimahi Techno Park.</p>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full shadow-lg space-y-4 border border-neutral-200">
+            <div className="text-center space-y-1.5">
+              <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
+                <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
+              </div>
+              <h3 className="text-base font-bold text-neutral-950">
+                Survei Kepuasan Masyarakat (SKM)
+              </h3>
+              <p className="text-xs text-neutral-500">
+                Kuesioner evaluasi pelayanan UPTD Cimahi Techno Park.
+              </p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 text-center">Tingkat Kepuasan Pelayanan</label>
+                <label className="block text-xs font-semibold text-neutral-800 mb-1.5 text-center">
+                  Tingkat Kepuasan Pelayanan
+                </label>
                 <div className="flex justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setSkmRating(star)}
-                      className={`text-3xl transition ${skmRating >= star ? 'scale-110' : 'opacity-30 hover:opacity-75'}`}
+                      className="p-1 transition-transform hover:scale-110 focus:outline-none focus:ring-1 focus:ring-yellow-400 rounded"
+                      aria-label={`Beri rating ${star} dari 5`}
                     >
-                      ⭐
+                      <Star
+                        className={`w-7 h-7 transition-colors ${
+                          skmRating >= star
+                            ? 'text-amber-500 fill-amber-500'
+                            : 'text-neutral-300 hover:text-neutral-400'
+                        }`}
+                      />
                     </button>
                   ))}
                 </div>
-                <p className="text-center text-xs font-semibold text-blue-600 mt-1">
-                  {skmRating === 5 ? 'Sangat Puas (5/5)' : skmRating === 4 ? 'Puas (4/5)' : skmRating === 3 ? 'Cukup (3/5)' : skmRating === 2 ? 'Kurang Puas (2/5)' : 'Sangat Kurang (1/5)'}
+                <p className="text-center text-xs font-bold text-primary-700 mt-1">
+                  {skmRating === 5
+                    ? 'Sangat Puas (5/5)'
+                    : skmRating === 4
+                    ? 'Puas (4/5)'
+                    : skmRating === 3
+                    ? 'Cukup (3/5)'
+                    : skmRating === 2
+                    ? 'Kurang Puas (2/5)'
+                    : 'Tidak Puas (1/5)'}
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Kritik, Saran & Ulasan</label>
+                <label className="block text-xs font-semibold text-neutral-800 mb-1">
+                  Kritik, Saran & Masukan
+                </label>
                 <textarea
-                  className="w-full border rounded-lg p-2.5 text-sm"
+                  className="w-full border border-neutral-300 rounded-lg p-2.5 text-sm focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
                   rows={3}
-                  placeholder="Ceritakan pengalaman Anda terkait fasilitas, kebersihan, atau pelayanan petugas..."
+                  placeholder="Berikan masukan mengenai kebersihan, fasilitas, atau pelayanan petugas..."
                   value={skmComment}
                   onChange={(e) => setSkmComment(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setSkmBookingId(null)}>Batal</Button>
-              <Button onClick={handleSkmSubmit} disabled={submittingSkm} className="bg-blue-600 hover:bg-blue-700">
-                {submittingSkm ? 'Mengirim...' : 'Kirim Ulasan'}
+            <div className="flex justify-end gap-2 pt-2 border-t border-neutral-100">
+              <Button variant="outline" size="sm" onClick={() => setSkmBookingId(null)}>
+                Tutup
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSkmSubmit}
+                disabled={submittingSkm}
+                className="bg-primary-700 hover:bg-primary-900 text-white"
+              >
+                {submittingSkm ? 'Mengirim...' : 'Kirim Ulasan Resmi'}
               </Button>
             </div>
           </div>
         </div>
       )}
-      {/* ── Form Pengajuan Baru ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pengajuan Peminjaman Ruangan</CardTitle>
-          <div className="flex gap-2 text-sm mt-2">
-            {[1,2,3,4].map(s => (
-              <span key={s} className={`px-3 py-1 rounded-full font-medium ${step === s ? 'bg-blue-600 text-white' : step > s ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {s === 1 ? '1. Pilih Ruangan' : s === 2 ? '2. Data Kegiatan' : s === 3 ? '3. Upload Surat' : '4. Konfirmasi'}
+
+      {/* ── Wizard Card ── */}
+      {step === 5 && confirmedBookingNumber ? (
+        <ConfirmationPanel
+          referenceNumber={confirmedBookingNumber}
+          onAction={() => {
+            setStep(1);
+            setConfirmedBookingNumber(null);
+          }}
+          actionText="Buat Pengajuan Lainnya"
+          onSecondaryAction={() => {
+            window.location.href = '/';
+          }}
+          secondaryActionText="Kembali ke Beranda"
+        />
+      ) : (
+        <div className="space-y-4">
+          {/* Breadcrumb / Step Indicator */}
+          <div className="flex items-center justify-between pb-2 border-b border-neutral-200">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                Formulir Peminjaman Fasilitas
               </span>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-
-          {/* STEP 1 */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Gedung *</label>
-                <select className="w-full border rounded-md p-2 text-sm" value={selectedBuilding} onChange={e => { setSelectedBuilding(e.target.value); setSelectedRoom(''); setRooms([]); }}>
-                  <option value="">-- Pilih Gedung --</option>
-                  {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tanggal & Waktu Mulai *</label>
-                  <Input type="datetime-local" value={dateStart} onChange={e => { setDateStart(e.target.value); setRooms([]); setSelectedRoom(''); }} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tanggal & Waktu Selesai *</label>
-                  <Input type="datetime-local" value={dateEnd} onChange={e => { setDateEnd(e.target.value); setRooms([]); setSelectedRoom(''); }} />
-                </div>
-              </div>
-              <Button variant="outline" onClick={fetchRooms} disabled={!selectedBuilding || !dateStart || !dateEnd}>
-                🔍 Lihat Ketersediaan Ruangan
-              </Button>
-
-              {rooms.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Pilih Ruangan:</p>
-                  {rooms.map(r => (
-                    <div key={r.id} onClick={() => r.isAvailable && setSelectedRoom(r.id)}
-                      className={`border rounded-lg p-3 cursor-pointer transition ${!r.isAvailable ? 'opacity-40 cursor-not-allowed bg-gray-50' : selectedRoom === r.id ? 'border-blue-500 bg-blue-50' : 'hover:border-blue-300'}`}>
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-semibold">{r.name}</span>
-                          <span className="text-sm text-gray-500 ml-2">— Kapasitas: {r.capacity} orang</span>
-                          {r.tariffs?.[0] && <span className="text-sm text-gray-500 ml-2">| Tarif: Rp {Number(r.tariffs[0].price).toLocaleString('id-ID')}</span>}
-                        </div>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${r.isAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                          {r.isAvailable ? '✅ Tersedia' : '❌ Tidak Tersedia'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="flex justify-end">
-                <Button onClick={goToStep2} disabled={!selectedRoom}>Lanjut →</Button>
-              </div>
+              <h2 className="text-xl sm:text-2xl font-bold text-neutral-950 mt-0.5">
+                {step === 1 && 'Langkah 1 dari 4: Pilih Ruangan & Jadwal'}
+                {step === 2 && 'Langkah 2 dari 4: Rincian Kegiatan'}
+                {step === 3 && 'Langkah 3 dari 4: Unggah Dokumen Permohonan'}
+                {step === 4 && 'Langkah 4 dari 4: Periksa & Konfirmasi Pengajuan'}
+              </h2>
             </div>
-          )}
-
-          {/* STEP 2 */}
-          {step === 2 && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Nama Kegiatan *</label>
-                <Input placeholder="Contoh: Rapat Koordinasi Dinas" value={formData.eventName} onChange={e => setFormData({...formData, eventName: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Jumlah Peserta *</label>
-                  <Input type="number" placeholder="Contoh: 50" value={formData.participantCount} onChange={e => setFormData({...formData, participantCount: e.target.value})} />
+            <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold">
+              {[1, 2, 3, 4].map((s) => (
+                <div
+                  key={s}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold ${
+                    step === s
+                      ? 'bg-primary-900 text-white'
+                      : step > s
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-neutral-200 text-neutral-600'
+                  }`}
+                >
+                  {step > s ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : s}
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {/* STEP 1: Gedung, Ruangan & Cal.com Date/Time Picker */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Kategori Pemohon *</label>
-                  <select className="w-full border rounded-md p-2 text-sm" value={formData.applicantCategory} onChange={e => setFormData({...formData, applicantCategory: e.target.value})}>
-                    <option value="">-- Pilih Kategori --</option>
-                    {APPLICANT_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  <label className="text-xs font-bold text-neutral-800 block mb-1">
+                    1. Pilih Gedung *
+                  </label>
+                  <select
+                    className="w-full h-11 px-3.5 rounded-lg border border-neutral-300 bg-white text-sm font-medium focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
+                    value={selectedBuilding}
+                    onChange={(e) => {
+                      setSelectedBuilding(e.target.value);
+                      setSelectedRoom('');
+                    }}
+                  >
+                    <option value="">-- Pilih Gedung Fasilitas --</option>
+                    {buildings.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-neutral-800 block mb-1">
+                    2. Pilih Ruangan *
+                  </label>
+                  <select
+                    className="w-full h-11 px-3.5 rounded-lg border border-neutral-300 bg-white text-sm font-medium focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
+                    value={selectedRoom}
+                    disabled={!selectedBuilding}
+                    onChange={(e) => setSelectedRoom(e.target.value)}
+                  >
+                    <option value="">-- Pilih Ruangan / Aula --</option>
+                    {rooms.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} (Kapasitas: {r.capacity} org)
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Deskripsi Peserta</label>
-                <Input placeholder="Contoh: Kepala Dinas dan staf dari 12 OPD" value={formData.attendeesDescription} onChange={e => setFormData({...formData, attendeesDescription: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Tujuan Kegiatan</label>
-                <Input placeholder="Contoh: Koordinasi program kerja tahunan" value={formData.activityPurpose} onChange={e => setFormData({...formData, activityPurpose: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Deskripsi Kegiatan</label>
-                <textarea className="w-full border rounded-md p-2 text-sm" rows={3} placeholder="Jelaskan kegiatan yang akan dilakukan..." value={formData.activityDescription} onChange={e => setFormData({...formData, activityDescription: e.target.value})} />
-              </div>
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(1)}>← Kembali</Button>
-                <Button onClick={goToStep3}>Lanjut →</Button>
-              </div>
-            </div>
-          )}
 
-          {/* STEP 3 */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm">
-                <p className="font-semibold text-yellow-800">⚠️ Dokumen Wajib</p>
-                <p className="text-yellow-700 mt-1">Surat Permohonan resmi bertandatangan dan berstempel dari instansi/organisasi pemohon.</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Surat Permohonan (PDF/JPG) *</label>
-                <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setSuratFile(e.target.files?.[0] || null)} />
-                {suratFile && <p className="text-xs text-green-600 mt-1">✓ {suratFile.name}</p>}
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Proposal Kegiatan (opsional)</label>
-                <Input type="file" accept=".pdf,.doc,.docx" onChange={e => setProposalFile(e.target.files?.[0] || null)} />
-                {proposalFile && <p className="text-xs text-green-600 mt-1">✓ {proposalFile.name}</p>}
-              </div>
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(2)}>← Kembali</Button>
-                <Button onClick={goToStep4}>Lanjut →</Button>
-              </div>
-            </div>
-          )}
+              {/* Once room is selected, display Cal.com Split Pane */}
+              {selectedRoomData ? (
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-neutral-800 block">
+                    3. Pilih Tanggal & Jam Kegiatan (Cal.com Split-Pane)
+                  </span>
+                  <CalComSplitPane
+                    room={selectedRoomData}
+                    selectedDate={selectedDate}
+                    onDateChange={(d) => setSelectedDate(d)}
+                    selectedSlot={selectedSlot}
+                    onSlotSelect={(slot) => {
+                      setSelectedSlot(slot);
+                    }}
+                    onConfirm={() => {
+                      handleSlotConfirmed();
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="p-8 border border-dashed border-neutral-300 rounded-xl bg-white text-center text-xs text-neutral-500 space-y-2">
+                  <Building2 className="w-8 h-8 text-neutral-300 mx-auto" />
+                  <p className="font-semibold text-neutral-800">
+                    Pilih gedung dan ruangan di atas untuk melihat kalender ketersediaan
+                  </p>
+                  <p className="text-neutral-500">
+                    Jadwal akan diperiksa secara langsung terhadap kalender operasional resmi UPTD CTP.
+                  </p>
+                </div>
+              )}
 
-          {/* STEP 4: Preview & Confirm */}
-          {step === 4 && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2 text-sm">
-                <h3 className="font-semibold text-blue-800">Ringkasan Pengajuan</h3>
-                <p><span className="text-gray-500">Ruangan:</span> {selectedRoomData?.name} ({selectedRoomData?.building?.name})</p>
-                <p><span className="text-gray-500">Waktu:</span> {dateStart && format(new Date(dateStart), 'dd MMM yyyy HH:mm')} – {dateEnd && format(new Date(dateEnd), 'HH:mm')}</p>
-                <p><span className="text-gray-500">Kegiatan:</span> {formData.eventName}</p>
-                <p><span className="text-gray-500">Peserta:</span> {formData.participantCount} orang ({formData.attendeesDescription})</p>
-                <p><span className="text-gray-500">Kategori:</span> {APPLICANT_CATEGORIES.find(c => c.value === formData.applicantCategory)?.label}</p>
-                <p><span className="text-gray-500">Surat Permohonan:</span> ✓ {suratFile?.name}</p>
-                {proposalFile && <p><span className="text-gray-500">Proposal:</span> ✓ {proposalFile.name}</p>}
-              </div>
-              <div className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(3)}>← Kembali</Button>
-                <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
-                  {submitting ? 'Mengirim...' : '📤 Ajukan Permohonan'}
+              <div className="flex justify-end pt-4 border-t border-neutral-200">
+                <Button
+                  onClick={handleProceedToStep2}
+                  disabled={!selectedRoom || !selectedDate || !selectedSlot}
+                  className="bg-primary-700 hover:bg-primary-900 text-white font-bold h-11 px-6"
+                >
+                  <span>Lanjutkan ke Rincian</span>
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
                 </Button>
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
 
-      {/* ── Riwayat Pengajuan ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Riwayat Pengajuan Saya</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {myBookings.length === 0 && <p className="text-gray-500 text-sm">Belum ada pengajuan.</p>}
-          {myBookings.map((b: any) => {
-            const stateInfo = STATE_LABELS[b.state] || { label: b.state, color: 'bg-gray-100 text-gray-600' };
-            return (
-              <div key={b.id} className="border rounded-lg p-4 space-y-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-sm">{b.bookingNumber}</p>
-                    <p className="text-sm text-gray-600">{b.eventName}</p>
-                    <p className="text-xs text-gray-400">{b.room?.name} | {format(new Date(b.dateStart), 'dd MMM yyyy HH:mm')} – {format(new Date(b.dateEnd), 'HH:mm')}</p>
-                  </div>
-                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${stateInfo.color}`}>{stateInfo.label}</span>
+          {/* STEP 2: Detail Kegiatan */}
+          {step === 2 && (
+            <div className="bg-white border border-neutral-200 rounded-lg p-6 space-y-4 shadow-xs">
+              <div>
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Nama Kegiatan / Acara *
+                </label>
+                <Input
+                  placeholder="Contoh: Rapat Kerja Dinas Koperasi & UKM Tahun 2026"
+                  value={formData.eventName}
+                  onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-neutral-800 block mb-1">
+                    Estimasi Jumlah Peserta (Orang) *
+                  </label>
+                  <Input
+                    type="number"
+                    placeholder="Contoh: 50"
+                    value={formData.participantCount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, participantCount: e.target.value })
+                    }
+                  />
+                  {selectedRoomData?.capacity && (
+                    <span className="text-[11px] text-neutral-500 mt-1 block">
+                      Daya tampung ruangan: maksimal {selectedRoomData.capacity} orang
+                    </span>
+                  )}
                 </div>
 
-                {/* Pesan perbaikan */}
-                {b.state === 'REVISION_NEEDED' && b.revisionNote && (
-                  <div className="bg-orange-50 border border-orange-200 rounded p-2 text-xs text-orange-800">
-                    <p className="font-semibold">⚠️ Catatan Admin:</p>
-                    <p>{b.revisionNote}</p>
-                  </div>
-                )}
+                <div>
+                  <label className="text-xs font-bold text-neutral-800 block mb-1">
+                    Kategori Pemohon *
+                  </label>
+                  <select
+                    className="w-full h-11 px-3.5 rounded-lg border border-neutral-300 bg-white text-sm focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
+                    value={formData.applicantCategory}
+                    onChange={(e) =>
+                      setFormData({ ...formData, applicantCategory: e.target.value })
+                    }
+                  >
+                    <option value="">-- Pilih Kategori --</option>
+                    {APPLICANT_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-                {/* Resubmit jika REVISION_NEEDED */}
-                {b.state === 'REVISION_NEEDED' && (
-                  <div className="pt-2">
-                    <p className="text-xs font-semibold mb-1">Upload Surat Permohonan Terbaru untuk Resubmit:</p>
-                    <div className="flex gap-2">
-                      <Input type="file" id={`resubmit-${b.id}`} className="text-xs" accept=".pdf,.jpg,.jpeg,.png" />
-                      <Button size="sm" onClick={() => {
-                        const fi = document.getElementById(`resubmit-${b.id}`) as HTMLInputElement;
-                        handleResubmit(b.id, fi?.files?.[0] || null);
-                      }}>Ajukan Ulang</Button>
-                    </div>
-                  </div>
-                )}
+              <div>
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Deskripsi Profil Peserta
+                </label>
+                <Input
+                  placeholder="Contoh: Kepala OPD, staf teknis, dan perwakilan UMKM"
+                  value={formData.attendeesDescription}
+                  onChange={(e) =>
+                    setFormData({ ...formData, attendeesDescription: e.target.value })
+                  }
+                />
+              </div>
 
-                {/* Upload bukti bayar jika WAITING_PAYMENT */}
-                {b.state === 'WAITING_PAYMENT' && (
-                  <div className="bg-purple-50 border border-purple-200 rounded p-2">
-                    <p className="text-xs font-semibold text-purple-800 mb-1">💳 Silakan lakukan pembayaran dan unggah bukti transfer:</p>
-                    <div className="flex gap-2">
-                      <Input type="file" id={`bukti-${b.id}`} className="text-xs" accept=".pdf,.jpg,.jpeg,.png" />
-                      <Button size="sm" className="bg-purple-600 hover:bg-purple-700" onClick={() => {
-                        const fi = document.getElementById(`bukti-${b.id}`) as HTMLInputElement;
-                        if (fi?.files?.[0]) handleUploadBukti(b.id, fi.files[0]);
-                      }}>Upload Bukti</Button>
-                    </div>
-                  </div>
-                )}
+              <div>
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Tujuan Kegiatan
+                </label>
+                <Input
+                  placeholder="Contoh: Sosialisasi regulasi pemanfaatan aset daerah"
+                  value={formData.activityPurpose}
+                  onChange={(e) =>
+                    setFormData({ ...formData, activityPurpose: e.target.value })
+                  }
+                />
+              </div>
 
-                {/* SKM untuk kegiatan COMPLETED */}
-                {b.state === 'COMPLETED' && !b.skmDone && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-amber-900">⭐ Kegiatan Telah Selesai</p>
-                      <p className="text-xs text-amber-700">Mohon luangkan 30 detik untuk memberikan survei kepuasan layanan.</p>
-                    </div>
+              <div>
+                <label className="text-xs font-bold text-neutral-800 block mb-1">
+                  Deskripsi & Susunan Singkat Acara
+                </label>
+                <textarea
+                  className="w-full border border-neutral-300 rounded-lg p-3 text-sm focus:border-neutral-950 focus:ring-2 focus:ring-yellow-400"
+                  rows={3}
+                  placeholder="Jelaskan secara ringkas rangkaian acara dan kebutuhan fasilitas pendukung..."
+                  value={formData.activityDescription}
+                  onChange={(e) =>
+                    setFormData({ ...formData, activityDescription: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-neutral-200">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                  className="h-11 px-5"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1.5" />
+                  Kembali
+                </Button>
+                <Button
+                  onClick={handleProceedToStep3}
+                  className="bg-primary-700 hover:bg-primary-900 text-white font-bold h-11 px-6"
+                >
+                  <span>Lanjutkan ke Dokumen</span>
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Upload Dokumen */}
+          {step === 3 && (
+            <div className="bg-white border border-neutral-200 rounded-lg p-6 space-y-5 shadow-xs">
+              <NotificationBanner
+                type="warning"
+                title="Persyaratan Dokumen Resmi Pemerintah"
+              >
+                Surat Permohonan wajib berkop resmi, bertanggal, ditandatangani pimpinan/pejabat
+                berwenang, dan dibubuhi stempel instansi atau Tanda Tangan Elektronik (TTE).
+              </NotificationBanner>
+
+              <div className="space-y-4 pt-2">
+                <div>
+                  <label className="text-xs font-bold text-neutral-800 block mb-1">
+                    Surat Permohonan Resmi (PDF / JPG) *
+                  </label>
+                  <Input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => setSuratFile(e.target.files?.[0] || null)}
+                  />
+                  {suratFile ? (
+                    <p className="text-xs font-semibold text-emerald-700 mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Berkas terpilih: {suratFile.name} ({(suratFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </p>
+                  ) : (
+                    <p className="text-xs text-neutral-500 mt-1">Maksimal ukuran file 10MB.</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-neutral-800 block mb-1">
+                    Proposal Kegiatan (Opsional)
+                  </label>
+                  <Input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => setProposalFile(e.target.files?.[0] || null)}
+                  />
+                  {proposalFile && (
+                    <p className="text-xs font-semibold text-emerald-700 mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Proposal terpilih: {proposalFile.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-neutral-200">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(2)}
+                  className="h-11 px-5"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1.5" />
+                  Kembali
+                </Button>
+                <Button
+                  onClick={handleProceedToStep4}
+                  disabled={!suratFile}
+                  className="bg-primary-700 hover:bg-primary-900 text-white font-bold h-11 px-6"
+                >
+                  <span>Periksa Data</span>
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: Periksa & Kirim (Summary List) */}
+          {step === 4 && (
+            <div className="space-y-5">
+              <div className="bg-white border border-neutral-200 rounded-lg p-6 space-y-4 shadow-xs">
+                <div>
+                  <h3 className="text-lg font-bold text-neutral-950">
+                    Periksa Kembali Data Pengajuan Anda
+                  </h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    Pastikan seluruh informasi telah sesuai sebelum diteruskan ke petugas review UPTD.
+                  </p>
+                </div>
+
+                {/* GOV.UK Summary List component */}
+                <SummaryList items={summaryItems} />
+
+                {/* Declaration Checkbox */}
+                <div className="pt-2">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={declarationChecked}
+                      onChange={(e) => setDeclarationChecked(e.target.checked)}
+                      className="h-4 w-4 rounded border-neutral-300 text-primary-700 focus:ring-yellow-400 mt-0.5"
+                    />
+                    <span className="text-xs text-neutral-800 leading-relaxed font-medium">
+                      Saya menyatakan bahwa data yang tercantum dalam permohonan ini adalah benar, dan
+                      bersedia mematuhi tata tertib pemanfaatan aset serta ketentuan retribusi daerah Kota
+                      Cimahi.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t border-neutral-200">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep(3)}
+                    disabled={submitting}
+                    className="h-11 px-5"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1.5" />
+                    Kembali
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!declarationChecked || submitting}
+                    className="bg-primary-700 hover:bg-primary-900 text-white font-bold h-11 px-6"
+                  >
+                    {submitting ? 'Mengirim Berkas...' : 'Kirim Pengajuan Resmi'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Riwayat Pengajuan Saya (Table / List) ── */}
+      <Card className="border border-neutral-200 shadow-xs rounded-lg bg-white">
+        <CardHeader className="pb-3 border-b border-neutral-200">
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="text-base font-bold text-neutral-950">
+                Riwayat Pengajuan Saya
+              </CardTitle>
+              <p className="text-xs text-neutral-500">
+                Daftar permohonan peminjaman ruangan yang pernah Anda ajukan.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-neutral-600 bg-neutral-100 px-2.5 py-1 rounded">
+              {myBookings.length} Pengajuan
+            </span>
+          </div>
+        </CardHeader>
+
+        <CardContent className="p-4 sm:p-6 space-y-4">
+          {myBookings.length === 0 && (
+            <div className="text-center py-8 text-xs text-neutral-500">
+              Belum ada riwayat pengajuan peminjaman ruangan.
+            </div>
+          )}
+
+          {myBookings.map((b: any) => (
+            <div
+              key={b.id}
+              className="border border-neutral-200 rounded-lg p-4 sm:p-5 space-y-3 hover:border-neutral-300 transition-colors bg-white shadow-2xs"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-sm text-neutral-950">
+                      {b.bookingNumber}
+                    </span>
+                    <StatusTag status={b.state} />
+                  </div>
+                  <h4 className="font-bold text-base text-neutral-900 mt-1">{b.eventName}</h4>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-600 mt-1">
+                    <span className="flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5 text-neutral-400" />
+                      {b.room?.name} ({b.room?.building?.name})
+                    </span>
+                    <span>&bull;</span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                      {format(new Date(b.dateStart), 'd MMM yyyy HH:mm', { locale: id })} –{' '}
+                      {format(new Date(b.dateEnd), 'HH:mm')} WIB
+                    </span>
+                    <span>&bull;</span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-neutral-400" />
+                      {b.participantCount} peserta
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Revision note notification banner */}
+              {b.state === 'REVISION_NEEDED' && b.revisionNote && (
+                <NotificationBanner type="warning" title="Perlu Perbaikan Berkas">
+                  <p className="font-semibold text-neutral-900">Catatan Petugas Admin:</p>
+                  <p className="mt-0.5">{b.revisionNote}</p>
+                </NotificationBanner>
+              )}
+
+              {/* Waiting payment upload prompt */}
+              {b.state === 'WAITING_PAYMENT' && (
+                <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-lg space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-950">
+                    <CreditCard className="w-4 h-4 text-amber-700" />
+                    <span>Silakan Lakukan Pembayaran Retribusi Resmi</span>
+                  </div>
+                  <p className="text-xs text-amber-900">
+                    Unggah bukti pembayaran (struk transfer / QRIS resmi) sebelum batas waktu H-1.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Input
+                      type="file"
+                      id={`bukti-${b.id}`}
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      className="text-xs h-9 bg-white"
+                    />
                     <Button
                       size="sm"
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
-                      onClick={() => setSkmBookingId(b.id)}
+                      className="bg-primary-700 hover:bg-primary-900 text-white text-xs h-9 font-semibold shrink-0"
+                      onClick={() => {
+                        const fi = document.getElementById(`bukti-${b.id}`) as HTMLInputElement;
+                        if (fi?.files?.[0]) handleUploadBukti(b.id, fi.files[0]);
+                      }}
                     >
-                      Isi Survei (SKM)
+                      Unggah Bukti
                     </Button>
                   </div>
-                )}
+                </div>
+              )}
 
-                {b.state === 'COMPLETED' && b.skmDone && (
-                  <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2 flex items-center gap-1.5 font-medium">
-                    <span>✅</span> Terima kasih! Ulasan Survei Kepuasan (SKM) telah Anda kirimkan.
+              {/* SKM Invitation Banner */}
+              {b.state === 'COMPLETED' && !b.skmDone && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-bold text-amber-950 flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 text-amber-600" />
+                      Kegiatan Telah Selesai Dilaksanakan
+                    </p>
+                    <p className="text-xs text-amber-800">
+                      Bantu kami mengevaluasi kualitas sarana dan petugas melalui Survei Kepuasan.
+                    </p>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs h-8 shrink-0"
+                    onClick={() => setSkmBookingId(b.id)}
+                  >
+                    Isi Survei SKM
+                  </Button>
+                </div>
+              )}
+
+              {b.state === 'COMPLETED' && b.skmDone && (
+                <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded p-2.5 flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Survei Kepuasan Masyarakat (SKM) untuk kegiatan ini telah Anda kirimkan. Terima kasih!</span>
+                </div>
+              )}
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>

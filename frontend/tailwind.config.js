@@ -23,8 +23,51 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "#1A3A6B",
+          foreground: "#FFFFFF",
+          50:  '#F0F4FA',
+          100: '#E8EEF7',
+          200: '#C5D5EC',
+          300: '#94B3DA',
+          500: '#2E5EA8',
+          700: '#1A3A6B',
+          900: '#0C1D3A',
+        },
+        accent: {
+          DEFAULT: "#0D7377",
+          foreground: "#FFFFFF",
+          50:  '#E6F5F5',
+          100: '#CCE9E9',
+          400: '#2AA5A9',
+          600: '#0D7377',
+        },
+        neutral: {
+          0:   '#FFFFFF',
+          100: '#F5F5F5',
+          200: '#E5E5E5',
+          400: '#A3A3A3',
+          700: '#404040',
+          950: '#0A0A0A',
+        },
+        success: {
+          DEFAULT: '#15803D',
+          50:  '#F0FDF4',
+          700: '#15803D',
+        },
+        warning: {
+          DEFAULT: '#CA8A04',
+          50:  '#FEFCE8',
+          600: '#CA8A04',
+        },
+        error: {
+          DEFAULT: '#DC2626',
+          50:  '#FEF2F2',
+          600: '#DC2626',
+        },
+        info: {
+          DEFAULT: '#2563EB',
+          50:  '#EFF6FF',
+          600: '#2563EB',
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -38,10 +81,6 @@ export default {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -50,6 +89,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+      },
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+      },
+      maxWidth: {
+        container: '1120px',
+        'form-narrow': '560px',
       },
       borderRadius: {
         lg: "var(--radius)",

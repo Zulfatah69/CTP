@@ -3,27 +3,47 @@ import { api } from '../../services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { StatusTag } from '@/components/ui/StatusTag';
+import { NotificationBanner } from '@/components/ui/NotificationBanner';
+import {
+  CalendarDays,
+  Clock,
+  CreditCard,
+  Building2,
+  AlertTriangle,
+  Megaphone,
+  ShieldCheck,
+  BarChart3,
+  Star,
+  Users,
+  ArrowRight,
+} from 'lucide-react';
 
 interface DashboardStats {
   total: number;
   byState: Record<string, number>;
   revenue: number;
   skmAverage: number;
-  paymentOverdue: Array<{ id: string; bookingNumber: string; eventName: string; dateStart: string; paymentDeadline: string }>;
+  paymentOverdue: Array<{
+    id: string;
+    bookingNumber: string;
+    eventName: string;
+    dateStart: string;
+    paymentDeadline: string;
+  }>;
 }
 
-const STATE_LABELS: Record<string, { label: string; color: string; emoji: string }> = {
-  DRAFT:           { label: 'Draft', color: 'bg-gray-100 text-gray-700', emoji: '📝' },
-  SUBMITTED:       { label: 'Menunggu Review', color: 'bg-blue-100 text-blue-700', emoji: '📨' },
-  UNDER_REVIEW:    { label: 'Sedang Direview', color: 'bg-yellow-100 text-yellow-700', emoji: '🔍' },
-  REVISION_NEEDED: { label: 'Perlu Perbaikan', color: 'bg-orange-100 text-orange-700', emoji: '✏️' },
-  APPROVED:        { label: 'Disetujui', color: 'bg-green-100 text-green-700', emoji: '✅' },
-  WAITING_PAYMENT: { label: 'Menunggu Pembayaran', color: 'bg-purple-100 text-purple-700', emoji: '💳' },
-  ACTIVE:          { label: 'Aktif', color: 'bg-emerald-100 text-emerald-700', emoji: '🟢' },
-  COMPLETED:       { label: 'Selesai', color: 'bg-gray-200 text-gray-700', emoji: '🏁' },
-  CANCELLED:       { label: 'Dibatalkan', color: 'bg-red-100 text-red-600', emoji: '🚫' },
-  REJECTED:        { label: 'Ditolak', color: 'bg-red-200 text-red-700', emoji: '❌' },
-};
+const ALL_STATUSES = [
+  'SUBMITTED',
+  'UNDER_REVIEW',
+  'REVISION_NEEDED',
+  'APPROVED',
+  'WAITING_PAYMENT',
+  'ACTIVE',
+  'COMPLETED',
+  'REJECTED',
+  'CANCELLED',
+];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -42,16 +62,15 @@ export default function Dashboard() {
       setLoading(true);
       const { data } = await api.get('/reports/bookings');
 
-      // Hitung byState dari data report
       const byState: Record<string, number> = {};
       (data.bookings || []).forEach((b: any) => {
         byState[b.state] = (byState[b.state] || 0) + 1;
       });
 
-      // Hitung payment overdue: WAITING_PAYMENT yang deadline-nya sudah lewat
       const now = new Date();
-      const paymentOverdue = (data.bookings || []).filter((b: any) =>
-        b.state === 'WAITING_PAYMENT' && b.paymentDeadline && new Date(b.paymentDeadline) < now
+      const paymentOverdue = (data.bookings || []).filter(
+        (b: any) =>
+          b.state === 'WAITING_PAYMENT' && b.paymentDeadline && new Date(b.paymentDeadline) < now
       );
 
       setStats({
@@ -68,135 +87,207 @@ export default function Dashboard() {
     }
   };
 
-  const needsAttention = (stats?.byState['SUBMITTED'] || 0) + (stats?.byState['REVISION_NEEDED'] || 0);
+  const needsAttention =
+    (stats?.byState['SUBMITTED'] || 0) +
+    (stats?.byState['UNDER_REVIEW'] || 0) +
+    (stats?.byState['REVISION_NEEDED'] || 0);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-900">Dashboard Admin</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Selamat datang{user ? `, ${user.email}` : ''} — UPTD Cimahi Techno Park
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-neutral-200">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-950">Dashboard Operasional</h1>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
+            Selamat bertugas, <b>{user?.email}</b> &bull; UPTD Cimahi Techno Park & Gedung BITC
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => navigate('/admin/bookings')}
+            className="bg-primary-700 hover:bg-primary-900 text-white text-xs font-semibold h-9"
+          >
+            <CalendarDays className="w-4 h-4 mr-1.5" />
+            Buka Antrean Booking
+          </Button>
+        </div>
       </div>
 
       {loading ? (
-        <p className="text-slate-400 animate-pulse">Memuat data dashboard...</p>
+        <div className="p-12 text-center text-xs text-neutral-500">Memuat data statistik operasional...</div>
       ) : (
         <>
-          {/* Metric Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-slate-200">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total Booking</p>
-                <p className="text-4xl font-bold text-slate-900 mt-1">{stats?.total ?? 0}</p>
-                <p className="text-xs text-slate-400 mt-1">Semua waktu</p>
+          {/* URGENT: Payment Overdue Warning Banner (Section 10.5) */}
+          {(stats?.paymentOverdue?.length ?? 0) > 0 && (
+            <NotificationBanner
+              type="error"
+              title={`PERHATIAN: ${stats!.paymentOverdue.length} Booking Melewati Batas Waktu Pembayaran (H-1)`}
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate('/admin/bookings')}
+                  className="bg-white border-red-300 text-red-800 hover:bg-red-50 text-xs h-8"
+                >
+                  Tindak Lanjuti
+                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              }
+            >
+              <p>
+                Permohonan berikut telah melampaui deadline retribusi (H-1 acara). Harap lakukan konfirmasi
+                atau ajukan permohonan toleransi ke Kepala UPTD sesuai ketentuan BR-PAYMENT-001.
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {stats!.paymentOverdue.map((b) => (
+                  <div
+                    key={b.id}
+                    className="flex items-center justify-between bg-white border border-red-200 rounded px-2.5 py-1.5 text-xs text-neutral-800"
+                  >
+                    <span className="font-mono font-bold text-red-700">{b.bookingNumber}</span>
+                    <span className="truncate max-w-xs">{b.eventName}</span>
+                    <span className="text-neutral-500">
+                      Batas: {new Date(b.paymentDeadline).toLocaleDateString('id-ID')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </NotificationBanner>
+          )}
+
+          {/* Key Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-neutral-200 rounded-lg shadow-xs bg-white">
+              <CardContent className="p-5 space-y-1">
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">
+                  Total Permohonan
+                </span>
+                <p className="text-3xl font-extrabold text-neutral-950 tabular-nums">
+                  {stats?.total ?? 0}
+                </p>
+                <p className="text-[11px] text-neutral-500">Akumulasi seluruh permohonan</p>
               </CardContent>
             </Card>
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Perlu Tindakan</p>
-                <p className="text-4xl font-bold text-blue-700 mt-1">{needsAttention}</p>
-                <p className="text-xs text-blue-500 mt-1">Baru masuk + perlu perbaikan</p>
+
+            <Card className="border-l-4 border-l-blue-600 border border-neutral-200 rounded-lg shadow-xs bg-white">
+              <CardContent className="p-5 space-y-1">
+                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
+                  Perlu Ditindaklanjuti
+                </span>
+                <p className="text-3xl font-extrabold text-blue-900 tabular-nums">{needsAttention}</p>
+                <p className="text-[11px] text-neutral-500">Menunggu review & perbaikan</p>
               </CardContent>
             </Card>
-            <Card className="border-emerald-200 bg-emerald-50">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Total Pendapatan</p>
-                <p className="text-2xl font-bold text-emerald-700 mt-1">
+
+            <Card className="border-neutral-200 rounded-lg shadow-xs bg-white">
+              <CardContent className="p-5 space-y-1">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">
+                  Realisasi Retribusi
+                </span>
+                <p className="text-xl sm:text-2xl font-extrabold text-neutral-950 tabular-nums">
                   Rp {(stats?.revenue ?? 0).toLocaleString('id-ID')}
                 </p>
-                <p className="text-xs text-emerald-500 mt-1">Pembayaran terverifikasi</p>
+                <p className="text-[11px] text-neutral-500">Pembayaran terverifikasi</p>
               </CardContent>
             </Card>
-            <Card className="border-amber-200 bg-amber-50">
-              <CardContent className="p-5">
-                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Rata-rata SKM</p>
-                <p className="text-4xl font-bold text-amber-700 mt-1">
+
+            <Card className="border-neutral-200 rounded-lg shadow-xs bg-white">
+              <CardContent className="p-5 space-y-1">
+                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">
+                  Indeks Kepuasan (SKM)
+                </span>
+                <p className="text-3xl font-extrabold text-amber-900 tabular-nums flex items-center gap-1">
+                  <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
                   {stats?.skmAverage ? `${stats.skmAverage}/5` : '—'}
                 </p>
-                <p className="text-xs text-amber-500 mt-1">Indeks kepuasan layanan</p>
+                <p className="text-[11px] text-neutral-500">Survei pelayanan publik</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Payment Overdue Warning — BR-PAYMENT-001 */}
-          {(stats?.paymentOverdue?.length ?? 0) > 0 && (
-            <Card className="border-red-300 bg-red-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-red-700 text-base flex items-center gap-2">
-                  ⚠️ Pembayaran Lewat Deadline (H-1) — {stats!.paymentOverdue.length} booking
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="text-xs text-red-600">Booking berikut belum melunasi pembayaran dan deadline telah terlewat. Harap tindak lanjuti (BR-PAYMENT-001).</p>
-                {stats!.paymentOverdue.map(b => (
-                  <div key={b.id} className="flex justify-between items-center bg-white border border-red-200 rounded-lg px-3 py-2 text-xs">
-                    <div>
-                      <span className="font-bold text-slate-800">{b.bookingNumber}</span>
-                      <span className="text-slate-500 ml-2">{b.eventName}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-red-600 font-medium">Deadline: {new Date(b.paymentDeadline).toLocaleDateString('id-ID')}</p>
-                    </div>
-                  </div>
-                ))}
-                <Button size="sm" variant="outline" className="text-red-600 border-red-300 mt-1" onClick={() => navigate('/admin/bookings')}>
-                  Lihat Semua Booking →
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Status Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Status Booking</CardTitle>
+          {/* Status Breakdown Grid */}
+          <Card className="border-neutral-200 rounded-lg shadow-xs bg-white">
+            <CardHeader className="pb-3 border-b border-neutral-200">
+              <CardTitle className="text-base font-bold text-neutral-950">
+                Distribusi Status Booking
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {Object.entries(STATE_LABELS).map(([state, info]) => {
-                  const count = stats?.byState[state] || 0;
-                  if (count === 0) return null;
+            <CardContent className="p-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {ALL_STATUSES.map((st) => {
+                  const count = stats?.byState[st] || 0;
                   return (
                     <div
-                      key={state}
-                      className={`rounded-lg p-3 text-center cursor-pointer hover:shadow-md transition ${info.color}`}
+                      key={st}
                       onClick={() => navigate('/admin/bookings')}
+                      className="p-3.5 rounded-lg border border-neutral-200 bg-neutral-50/50 hover:bg-neutral-100/70 hover:border-neutral-300 transition-colors cursor-pointer flex flex-col justify-between space-y-2"
                     >
-                      <p className="text-xl">{info.emoji}</p>
-                      <p className="text-2xl font-bold mt-1">{count}</p>
-                      <p className="text-xs mt-0.5 font-medium">{info.label}</p>
+                      <StatusTag status={st} size="sm" />
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-neutral-900 tabular-nums">
+                          {count}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
-                {Object.values(stats?.byState || {}).every(v => v === 0) && (
-                  <p className="text-sm text-slate-400 col-span-5 text-center py-4">Belum ada data booking.</p>
-                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Aksi Cepat</CardTitle>
+          {/* Quick Action Toolbar */}
+          <Card className="border-neutral-200 rounded-lg shadow-xs bg-white">
+            <CardHeader className="pb-3 border-b border-neutral-200">
+              <CardTitle className="text-base font-bold text-neutral-950">
+                Pintasan Menu Operasional
+              </CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-3">
-              <Button onClick={() => navigate('/admin/bookings')} className="bg-blue-600 hover:bg-blue-700">
-                📋 Kelola Booking
+            <CardContent className="p-5 flex flex-wrap gap-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin/bookings')}
+                className="text-xs h-9 text-neutral-800"
+              >
+                <CalendarDays className="w-4 h-4 mr-1.5 text-primary-700" />
+                Daftar Permohonan Booking
               </Button>
-              <Button onClick={() => navigate('/admin/buildings')} variant="outline">
-                🏢 Master Gedung & Ruangan
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin/buildings')}
+                className="text-xs h-9 text-neutral-800"
+              >
+                <Building2 className="w-4 h-4 mr-1.5 text-primary-700" />
+                Kelola Gedung & Ruangan
               </Button>
-              <Button onClick={() => navigate('/admin/reports')} variant="outline">
-                📊 Laporan & Statistik
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin/reports')}
+                className="text-xs h-9 text-neutral-800"
+              >
+                <BarChart3 className="w-4 h-4 mr-1.5 text-primary-700" />
+                Laporan & Ekspor Data
               </Button>
-              <Button onClick={() => navigate('/admin/announcements')} variant="outline">
-                📢 Kelola Pengumuman
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin/announcements')}
+                className="text-xs h-9 text-neutral-800"
+              >
+                <Megaphone className="w-4 h-4 mr-1.5 text-primary-700" />
+                Publikasi Pengumuman
               </Button>
-              <Button onClick={() => navigate('/admin/audit')} variant="outline">
-                🔍 Audit Trail
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin/audit')}
+                className="text-xs h-9 text-neutral-800"
+              >
+                <ShieldCheck className="w-4 h-4 mr-1.5 text-primary-700" />
+                Audit Trail Log
               </Button>
             </CardContent>
           </Card>

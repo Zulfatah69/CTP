@@ -7,6 +7,9 @@ const router = Router();
 
 const ADMIN_ROLES = [Role.ADMIN, Role.KEPALA_UPTD];
 
+// Public: Jadwal kalender operasional publik (read-only, sanitized)
+router.get('/public-calendar', bookingController.getPublicCalendar);
+
 // Semua user terautentikasi
 router.get('/', authenticate, bookingController.getBookings);
 router.get('/:id', authenticate, bookingController.getBooking);

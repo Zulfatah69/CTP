@@ -2,19 +2,20 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../services/api';
 import { useToast } from '../hooks/use-toast';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Building2, ArrowLeft, LogIn } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  email: z.string().email('Format email tidak valid'),
+  password: z.string().min(1, 'Password wajib diisi'),
 });
 
 export default function Login() {
@@ -36,22 +37,21 @@ export default function Login() {
     try {
       const response = await api.post('/auth/login', values);
       setAuth(response.data.user, response.data.accessToken);
-      
+
       toast({
-        title: "Login Successful",
-        description: `Welcome back, ${response.data.user.email}!`,
+        title: 'Masuk Berhasil',
+        description: `Selamat datang kembali, ${response.data.user.email}!`,
       });
-      
+
       // Redirect based on role
       const role = response.data.user.role;
       if (role === 'PEMOHON') navigate('/portal');
       else navigate('/admin');
-      
     } catch (error: any) {
       toast({
-        title: "Login Failed",
-        description: error.response?.data?.message || "An error occurred",
-        variant: "destructive"
+        title: 'Gagal Masuk',
+        description: error.response?.data?.message || 'Kredensial salah atau akun tidak ditemukan.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -59,62 +59,97 @@ export default function Login() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-zinc-950">
-      <Card className="w-[400px]">
-        <CardHeader>
-          <CardTitle>Masuk CTP Portal</CardTitle>
-          <CardDescription>Masukkan kredensial Anda untuk melanjutkan</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="admin@cimahi.go.id" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
-                {isLoading ? "Memproses..." : "Masuk"}
-              </Button>
-            </form>
-          </Form>
+    <div className="flex min-h-screen bg-neutral-100 items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-4">
+        {/* Back Link */}
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 hover:text-primary-900 underline underline-offset-2"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Kembali ke Beranda Utama
+        </Link>
 
-          <div className="text-center mt-6 text-sm text-slate-600 space-y-2">
-            <p>
-              Belum punya akun?{' '}
-              <a href="/register" className="text-blue-600 font-semibold hover:underline">
-                Daftar di sini
-              </a>
-            </p>
-            <p>
-              <a href="/" className="text-xs text-slate-400 hover:text-slate-600">
-                ← Kembali ke Beranda Utama
-              </a>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+        <Card className="border border-neutral-200 shadow-xs rounded-lg bg-white">
+          <CardHeader className="text-center pb-4 pt-6">
+            <div className="mx-auto w-11 h-11 bg-primary-900 text-white rounded-lg flex items-center justify-center mb-3 shadow-xs">
+              <Building2 className="w-6 h-6 text-white" />
+            </div>
+            <CardTitle className="text-xl font-bold text-neutral-950">
+              Masuk Portal Layanan
+            </CardTitle>
+            <CardDescription className="text-xs text-neutral-500">
+              UPTD Cimahi Techno Park & BITC Kota Cimahi
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4 px-6 pb-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-semibold text-neutral-800">
+                        Alamat Email Resmi
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="nama@instansi.go.id atau email Anda"
+                          type="email"
+                          autoComplete="email"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-600" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-semibold text-neutral-800">
+                        Kata Sandi
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs text-red-600" />
+                    </FormItem>
+                  )}
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full bg-primary-700 hover:bg-primary-900 text-white font-bold h-11"
+                  disabled={isLoading}
+                >
+                  <LogIn className="w-4 h-4 mr-1.5" />
+                  {isLoading ? 'Memverifikasi...' : 'Masuk ke Sistem'}
+                </Button>
+              </form>
+            </Form>
+
+            <div className="pt-4 border-t border-neutral-200 text-center text-xs text-neutral-600 space-y-1">
+              <p>
+                Belum memiliki akun pemohon?{' '}
+                <Link to="/register" className="font-bold text-primary-700 hover:underline">
+                  Daftar akun baru
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

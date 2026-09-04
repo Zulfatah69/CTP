@@ -3,111 +3,244 @@ import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar, momentLocalizer } from 'react-big-calendar';
-import moment from 'moment';
-import 'react-big-calendar/lib/css/react-big-calendar.css';
+import { OperationalCalendar, type CalendarEventItem } from '@/components/calendar/OperationalCalendar';
+import {
+  Building2,
+  CalendarDays,
+  Camera,
+  GraduationCap,
+  Laptop,
+  Mic,
+  ArrowRight,
+  ShieldCheck,
+  FileCheck2,
+  Bell,
+  Search,
+  Users,
+  MapPin,
+  Clock,
+  ExternalLink,
+} from 'lucide-react';
 
-const localizer = momentLocalizer(moment);
+const SERVICES = [
+  {
+    code: 'SVC-001',
+    title: 'Peminjaman Ruangan CTP',
+    category: 'Fasilitas & Gedung',
+    description: 'Convention Hall, Ruang Rapat, dan Ruang Workshop representatif di kawasan Cimahi Techno Park.',
+    icon: Building2,
+    href: '/portal',
+  },
+  {
+    code: 'SVC-002',
+    title: 'Peminjaman Fasilitas BITC',
+    category: 'Fasilitas & Gedung',
+    description: 'Convention Hall dan fasilitas pertemuan di Gedung Baros Information Technology Creative.',
+    icon: Building2,
+    href: '/portal',
+  },
+  {
+    code: 'SVC-003',
+    title: 'Praktik Kerja Lapangan (PKL)',
+    category: 'Edukasi & Riset',
+    description: 'Penerimaan dan registrasi magang serta penelitian mahasiswa/siswa berbasis kuota terpadu.',
+    icon: GraduationCap,
+    href: '/portal',
+  },
+  {
+    code: 'SVC-004',
+    title: 'Katalog FOKUS Produk UMKM',
+    category: 'Pemberdayaan Usaha',
+    description: 'Layanan pemotretan profesional dan etalase digital produk industri kreatif UMKM Cimahi.',
+    icon: Camera,
+    href: '#fokus',
+  },
+  {
+    code: 'SVC-005',
+    title: 'Working Space BITC',
+    category: 'Ruang Kerja Bersama',
+    description: 'Pemanfaatan ruang kerja kolaboratif dengan konektivitas cepat dan fasilitas terintegrasi.',
+    icon: Laptop,
+    href: '/portal',
+  },
+  {
+    code: 'SVC-006',
+    title: 'Virtual Office',
+    category: 'Legalitas Usaha',
+    description: 'Fasilitas alamat domisili usaha dan penanganan korespondensi bisnis bagi startup dan UMKM.',
+    icon: FileCheck2,
+    href: '/portal',
+  },
+  {
+    code: 'SVC-007',
+    title: 'Studio Dubbing & Audio',
+    category: 'Multimedia & Seni',
+    description: 'Studio kedap suara dengan perangkat rekaman profesional untuk voice-over dan podcast.',
+    icon: Mic,
+    href: '/portal',
+  },
+];
 
 export default function Landing() {
   const [buildings, setBuildings] = useState<any[]>([]);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     // Load public announcements
-    api.get('/announcements').then(res => setAnnouncements(res.data)).catch(() => {});
+    api.get('/announcements').then((res) => setAnnouncements(res.data)).catch(() => {});
 
     // Load public buildings
-    api.get('/master/buildings').then(res => setBuildings(res.data)).catch(() => {});
-    
+    api.get('/master/buildings').then((res) => setBuildings(res.data)).catch(() => {});
+
     // Load public calendar
-    api.get('/bookings').then(res => {
-      const approved = res.data.filter((b: any) => b.state === 'APPROVED' || b.state === 'ACTIVE');
-      setEvents(approved.map((b: any) => ({
-        id: b.id,
-        title: `${b.room?.name || 'Ruangan'} - ${b.eventName}`,
-        start: new Date(b.dateStart),
-        end: new Date(b.dateEnd)
-      })));
-    }).catch(() => {});
+    api
+      .get('/bookings/public-calendar')
+      .then((res) => {
+        setEvents(
+          res.data.map((b: any) => ({
+            id: b.id,
+            title: `${b.room?.name || 'Ruangan'} - ${b.eventName}`,
+            eventName: b.eventName,
+            roomName: b.room?.name || 'Ruangan',
+            buildingName: b.room?.building?.name || '',
+            start: new Date(b.dateStart),
+            end: new Date(b.dateEnd),
+            state: b.state,
+            participantCount: b.participantCount,
+            applicantName: b.user?.fullName || b.user?.email || 'Pemohon Terdaftar',
+          }))
+        );
+      })
+      .catch(() => {});
   }, []);
 
+  const filteredServices = SERVICES.filter(
+    (s) =>
+      s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-      {/* Top Navbar */}
-      <header className="bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-neutral-100 text-neutral-950 flex flex-col font-sans">
+      {/* 1. Formal Top Header */}
+      <header className="bg-primary-900 text-white sticky top-0 z-40 border-b border-primary-700/50 shadow-xs">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center text-xl font-bold">
-              🏛️
+            <div className="w-9 h-9 bg-accent-600 text-white rounded-lg flex items-center justify-center font-bold shadow-xs">
+              <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="font-bold text-slate-900 leading-none block">Cimahi Techno Park</span>
-              <span className="text-[11px] text-slate-500 block">Digital Service Portal</span>
+              <span className="font-bold text-sm sm:text-base leading-none block text-white">
+                UPTD Cimahi Techno Park
+              </span>
+              <span className="text-[11px] text-neutral-300 block font-normal mt-0.5">
+                Pemerintah Kota Cimahi &bull; Layanan Publik
+              </span>
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-            <a href="#tentang" className="hover:text-blue-600 transition">Tentang</a>
-            <a href="#sop" className="hover:text-blue-600 transition">Alur Peminjaman</a>
-            <a href="#ruangan" className="hover:text-blue-600 transition">Fasilitas Ruangan</a>
-            <a href="#kalender" className="hover:text-blue-600 transition">Kalender Jadwal</a>
+          <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-neutral-200">
+            <a href="#layanan" className="hover:text-white transition-colors">Katalog Layanan</a>
+            <a href="#sop" className="hover:text-white transition-colors">Alur SOP</a>
+            <a href="#fasilitas" className="hover:text-white transition-colors">Fasilitas Ruangan</a>
+            <a href="#kalender" className="hover:text-white transition-colors">Kalender Publik</a>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Link to="/login">
-              <Button variant="outline" size="sm" className="font-medium">Masuk</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-transparent border-primary-500 text-white hover:bg-primary-800 hover:text-white text-xs h-9 px-3.5"
+              >
+                Masuk
+              </Button>
             </Link>
             <Link to="/register">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 font-medium">Daftar Akun</Button>
+              <Button
+                size="sm"
+                className="bg-primary-700 hover:bg-primary-500 text-white font-semibold text-xs h-9 px-3.5 shadow-xs"
+              >
+                Daftar Akun
+              </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-900 via-blue-800 to-indigo-900 text-white py-20 px-6 text-center">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <span className="inline-block px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded-full text-xs font-semibold text-blue-200 uppercase tracking-wide">
-            Satu Pintu Layanan UPTD Cimahi Techno Park & BITC
-          </span>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-            Peminjaman Ruangan & Fasilitas Gedung Jadi Lebih Cepat & Transparan
+      {/* 2. Authoritative Hero (No decorative gradients per Design.md Section 12) */}
+      <section className="bg-primary-900 text-white py-14 sm:py-18 px-4 sm:px-6 border-b border-primary-800">
+        <div className="max-w-4xl mx-auto space-y-6 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary-800/90 border border-primary-700 rounded-full text-xs font-semibold text-neutral-200">
+            <ShieldCheck className="w-3.5 h-3.5 text-accent-400" />
+            Portal Pelayanan Publik Resmi UPTD CTP & Gedung BITC
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+            Portal Layanan Cimahi Techno Park
           </h1>
-          <p className="text-lg text-blue-100/90 max-w-2xl mx-auto leading-relaxed">
-            Ajukan reservasi Convention Hall, Ruang Rapat, dan Studio Multimedia secara digital dengan verifikasi berkas resmi dan jadwal ketersediaan waktu-nyata.
+
+          <p className="text-base sm:text-lg text-neutral-200 max-w-2xl mx-auto leading-relaxed">
+            Penyelenggaraan reservasi fasilitas gedung pemerintah, perizinan pemanfaatan, pendaftaran PKL, dan ruang kreatif secara transparan dan akuntabel.
           </p>
-          <div className="flex flex-wrap justify-center gap-4 pt-4">
+
+          {/* Quick Search Bar */}
+          <div className="pt-2 max-w-xl mx-auto">
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 text-neutral-400 absolute left-3.5" />
+              <input
+                type="text"
+                placeholder="Cari ruangan, layanan, atau ketentuan..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-11 pl-10 pr-4 text-sm text-neutral-900 bg-white rounded-lg border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
             <Link to="/portal">
-              <Button size="lg" className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-8 shadow-lg shadow-amber-500/20">
-                🚀 Ajukan Peminjaman Ruangan
+              <Button size="lg" className="bg-white text-primary-900 hover:bg-neutral-100 font-bold px-6 text-sm">
+                Ajukan Peminjaman Ruangan
+                <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>
             <a href="#kalender">
-              <Button size="lg" variant="outline" className="text-white border-white/40 hover:bg-white/10 px-6">
-                📅 Cek Ketersediaan Jadwal
+              <Button
+                size="lg"
+                variant="outline"
+                className="bg-transparent border-primary-600 text-white hover:bg-primary-800 font-medium px-5 text-sm"
+              >
+                Cek Ketersediaan Jadwal
               </Button>
             </a>
           </div>
         </div>
       </section>
 
-      {/* Announcements Banner Section */}
+      {/* 3. Official Announcements Banner (Amber alert per Design.md Section 6.6) */}
       {announcements.length > 0 && (
-        <section className="bg-amber-50 border-y border-amber-200 py-6 px-6">
-          <div className="max-w-7xl mx-auto space-y-3">
-            <div className="flex items-center gap-2 text-amber-800 font-bold text-sm uppercase tracking-wide">
-              <span>📢</span> Pengumuman & Informasi Terbaru
+        <section className="bg-amber-50 border-b border-amber-300 py-4 px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center gap-2 text-amber-950 font-bold text-xs uppercase tracking-wider mb-2">
+              <Bell className="w-4 h-4 text-amber-700" />
+              <span>Pengumuman Resmi UPTD</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {announcements.map((item) => (
-                <div key={item.id} className="bg-white border border-amber-200 rounded-lg p-4 shadow-xs space-y-1">
-                  <span className="text-[10px] text-amber-700 font-semibold uppercase bg-amber-100 px-2 py-0.5 rounded">
-                    Info Resmi
+                <div
+                  key={item.id}
+                  className="bg-white border-l-4 border-l-amber-600 border border-neutral-200 rounded-r-lg p-3.5 shadow-2xs"
+                >
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wide block">
+                    {item.priority === 'URGENT' ? 'Penting' : 'Informasi'}
                   </span>
-                  <h4 className="font-bold text-slate-900 text-sm mt-1">{item.title}</h4>
-                  <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">{item.content}</p>
+                  <h4 className="font-bold text-neutral-900 text-xs mt-0.5">{item.title}</h4>
+                  <p className="text-xs text-neutral-600 line-clamp-2 mt-1 leading-relaxed">
+                    {item.content}
+                  </p>
                 </div>
               ))}
             </div>
@@ -115,143 +248,229 @@ export default function Landing() {
         </section>
       )}
 
-      {/* SOP Section */}
-      <section id="sop" className="py-16 px-6 max-w-7xl mx-auto w-full">
-        <div className="text-center space-y-2 mb-12">
-          <h2 className="text-3xl font-bold text-slate-900">Alur & Standar Prosedur (SOP)</h2>
-          <p className="text-slate-500 text-sm">4 langkah mudah pengajuan pemanfaatan fasilitas UPTD CTP</p>
+      {/* 4. Services Catalog Grid (Section 10.2) */}
+      <section id="layanan" className="py-12 sm:py-16 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-6">
+        <div className="space-y-1">
+          <span className="text-xs font-bold text-accent-600 uppercase tracking-wider">
+            Katalog Pelayanan
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-neutral-950">
+            Layanan Terpadu Satu Pintu
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-600">
+            Pilih jenis fasilitas atau program layanan UPTD Cimahi Techno Park sesuai kebutuhan Anda.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs relative">
-            <div className="w-10 h-10 bg-blue-100 text-blue-700 font-bold rounded-lg flex items-center justify-center mb-4 text-lg">
-              1
-            </div>
-            <h3 className="font-bold text-slate-800 mb-2">Pilih Ruangan & Jadwal</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Pilih gedung CTP atau BITC, tentukan tanggal serta jam kegiatan, dan sistem akan menampilkan ruangan yang tersedia.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs relative">
-            <div className="w-10 h-10 bg-blue-100 text-blue-700 font-bold rounded-lg flex items-center justify-center mb-4 text-lg">
-              2
-            </div>
-            <h3 className="font-bold text-slate-800 mb-2">Upload Surat Permohonan</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Lengkapi data kegiatan dan unggah surat permohonan resmi berstempel dari instansi / organisasi Anda.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs relative">
-            <div className="w-10 h-10 bg-blue-100 text-blue-700 font-bold rounded-lg flex items-center justify-center mb-4 text-lg">
-              3
-            </div>
-            <h3 className="font-bold text-slate-800 mb-2">Disposisi & Persetujuan</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Admin UPTD memproses lembar disposisi resmi pimpinan dan mengunci slot ruangan Anda dari bentrok pemohon lain.
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs relative">
-            <div className="w-10 h-10 bg-blue-100 text-blue-700 font-bold rounded-lg flex items-center justify-center mb-4 text-lg">
-              4
-            </div>
-            <h3 className="font-bold text-slate-800 mb-2">Konfirmasi & Pelaksanaan</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Unggah bukti retribusi jika berbayar, terima notifikasi WhatsApp resmi, dan PIC UPTD siap melayani kegiatan Anda.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Ruangan Section */}
-      <section id="ruangan" className="py-16 px-6 bg-slate-100">
-        <div className="max-w-7xl mx-auto space-y-8">
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl font-bold text-slate-900">Daftar Fasilitas Gedung</h2>
-            <p className="text-slate-500 text-sm">Gedung Cimahi Techno Park & Baros Information Technology Creative (BITC)</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {buildings.flatMap(b => b.rooms?.map((r: any) => (
-              <Card key={r.id} className="overflow-hidden border-slate-200 hover:shadow-md transition">
-                <div className="h-44 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-4xl text-white">
-                  🏢
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredServices.map((svc) => {
+            const Icon = svc.icon;
+            return (
+              <Card
+                key={svc.code}
+                className="border-neutral-200 rounded-lg shadow-xs hover:border-primary-500 hover:shadow-sm transition-all flex flex-col justify-between"
+              >
                 <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg text-slate-900">{r.name}</CardTitle>
-                      <CardDescription className="text-xs text-blue-600 font-medium">{b.name} (Lt. {r.floor || 1})</CardDescription>
-                    </div>
-                    <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded">
-                      Kapasitas {r.capacity} org
-                    </span>
+                  <div className="w-10 h-10 rounded-lg bg-primary-100 text-primary-900 flex items-center justify-center mb-3">
+                    <Icon className="w-5 h-5 text-primary-700" />
                   </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                    {svc.category}
+                  </span>
+                  <CardTitle className="text-base font-bold text-neutral-900 mt-1">
+                    {svc.title}
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-xs text-slate-600">
-                  <p>{r.description || 'Fasilitas pertemuan representatif dengan AC, Sound System, dan LCD Proyektor.'}</p>
-                  {r.tariffs?.[0] && (
-                    <div className="pt-2 border-t flex justify-between items-center">
-                      <span className="text-slate-400">Tarif Retribusi:</span>
-                      <span className="font-bold text-slate-900 text-sm">
-                        Rp {Number(r.tariffs[0].price).toLocaleString('id-ID')} / {r.tariffs[0].unit}
-                      </span>
-                    </div>
-                  )}
+                <CardContent className="space-y-4 text-xs text-neutral-600 leading-relaxed">
+                  <p>{svc.description}</p>
+                  <Link
+                    to={svc.href}
+                    className="inline-flex items-center gap-1 font-bold text-primary-700 hover:text-primary-900 pt-2 border-t border-neutral-100 w-full"
+                  >
+                    <span>Ajukan Layanan</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </CardContent>
               </Card>
-            )))}
-          </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* Kalender Section */}
-      <section id="kalender" className="py-16 px-6 max-w-7xl mx-auto w-full space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl font-bold text-slate-900">Kalender Jadwal Kegiatan Publik</h2>
-          <p className="text-slate-500 text-sm">Pantau jadwal ruangan yang telah terkonfirmasi agar memudahkan penentuan tanggal acara Anda</p>
-        </div>
+      {/* 5. SOP & Alur Pelayanan (GOV.UK Clean Step Process) */}
+      <section id="sop" className="py-12 sm:py-16 px-4 sm:px-6 bg-white border-y border-neutral-200">
+        <div className="max-w-6xl mx-auto space-y-8">
+          <div className="text-center space-y-1 max-w-2xl mx-auto">
+            <span className="text-xs font-bold text-accent-600 uppercase tracking-wider">
+              Standar Operasional Prosedur
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-950">
+              Alur Pengajuan & Pemanfaatan Fasilitas
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-600">
+              4 langkah mudah pemanfaatan sarana gedung UPTD CTP dan BITC secara akuntabel.
+            </p>
+          </div>
 
-        <Card className="shadow-xs border-slate-200">
-          <CardContent className="p-6">
-            <div style={{ height: '550px' }}>
-              <Calendar
-                localizer={localizer}
-                events={events}
-                startAccessor="start"
-                endAccessor="end"
-                views={['month', 'week', 'day']}
-                defaultView="month"
-              />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 rounded-lg border border-neutral-200 bg-neutral-50/50 space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-primary-900 text-white font-bold text-xs flex items-center justify-center">
+                1
+              </div>
+              <h3 className="font-bold text-sm text-neutral-900">Pilih Ruangan & Jadwal</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Tentukan gedung CTP atau BITC, pilih tanggal kalender, dan tentukan slot jam ketersediaan.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="p-5 rounded-lg border border-neutral-200 bg-neutral-50/50 space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-primary-900 text-white font-bold text-xs flex items-center justify-center">
+                2
+              </div>
+              <h3 className="font-bold text-sm text-neutral-900">Upload Surat Permohonan</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Lengkapi rincian kegiatan dan unggah dokumen surat permohonan resmi berstempel basah/TTE.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-lg border border-neutral-200 bg-neutral-50/50 space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-primary-900 text-white font-bold text-xs flex items-center justify-center">
+                3
+              </div>
+              <h3 className="font-bold text-sm text-neutral-900">Disposisi & Approval</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                Admin memproses lembar disposisi pimpinan dinas dan mengunci slot ruangan resmi dari bentrok jadwal.
+              </p>
+            </div>
+
+            <div className="p-5 rounded-lg border border-neutral-200 bg-neutral-50/50 space-y-3">
+              <div className="w-8 h-8 rounded-lg bg-primary-900 text-white font-bold text-xs flex items-center justify-center">
+                4
+              </div>
+              <h3 className="font-bold text-sm text-neutral-900">Pelaksanaan & SKM</h3>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                PIC UPTD mendampingi kegiatan di lapangan. Setelah selesai, pemohon mengisi survei kepuasan.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-12 px-6 mt-auto">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-xs leading-relaxed">
-          <div>
-            <h4 className="text-white font-bold text-sm mb-3">UPTD Cimahi Techno Park</h4>
-            <p>Dinas Perdagangan, Koperasi, UKM dan Perindustrian Kota Cimahi</p>
-            <p className="mt-2">Jl. Baros No. 78, Utama, Kec. Cimahi Selatan, Kota Cimahi, Jawa Barat 40533</p>
+      {/* 6. Fasilitas Ruangan Section */}
+      <section id="fasilitas" className="py-12 sm:py-16 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-6">
+        <div className="space-y-1">
+          <span className="text-xs font-bold text-accent-600 uppercase tracking-wider">
+            Daftar Sarana
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-neutral-950">
+            Fasilitas Ruangan Representatif
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-600">
+            Fasilitas pertemuan, aula konvensi, dan ruang rapat di Cimahi Techno Park & BITC.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {buildings.flatMap((b) =>
+            b.rooms?.map((r: any) => (
+              <Card key={r.id} className="border-neutral-200 rounded-lg shadow-xs overflow-hidden flex flex-col justify-between">
+                <div>
+                  <div className="h-36 bg-primary-900 text-white flex flex-col items-center justify-center relative p-4 text-center">
+                    <Building2 className="w-10 h-10 text-neutral-300 mb-1" />
+                    <span className="text-xs font-semibold text-neutral-200">{b.name}</span>
+                  </div>
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <CardTitle className="text-base font-bold text-neutral-900">{r.name}</CardTitle>
+                        <CardDescription className="text-xs text-neutral-500">Lantai {r.floor || 1}</CardDescription>
+                      </div>
+                      <span className="text-xs font-semibold px-2 py-0.5 bg-neutral-100 text-neutral-800 rounded border border-neutral-300 shrink-0">
+                        {r.capacity} org
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-xs text-neutral-600 leading-relaxed">
+                    <p>{r.description || 'Fasilitas pertemuan representatif dilengkapi pendingin ruangan (AC), sound system, dan proyektor.'}</p>
+                  </CardContent>
+                </div>
+
+                <div className="p-4 pt-2 border-t border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-neutral-500 uppercase tracking-wide block">Tarif Retribusi:</span>
+                    <span className="text-sm font-bold text-neutral-900 tabular-nums">
+                      {r.tariffs?.[0]
+                        ? `Rp ${Number(r.tariffs[0].price).toLocaleString('id-ID')} / ${r.tariffs[0].unit}`
+                        : 'Sesuai Perda'}
+                    </span>
+                  </div>
+                  <Link to="/portal">
+                    <Button size="sm" className="bg-primary-700 hover:bg-primary-900 text-white text-xs h-8 font-semibold">
+                      Reservasi
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* 7. Public Calendar Section */}
+      <section id="kalender" className="py-12 sm:py-16 px-4 sm:px-6 bg-white border-t border-neutral-200">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="space-y-1">
+            <span className="text-xs font-bold text-accent-600 uppercase tracking-wider">
+              Transparansi Jadwal
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-950">
+              Kalender Agenda Kegiatan Publik
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-600">
+              Pantau jadwal kegiatan yang telah terkonfirmasi resmi sebelum mengajukan tanggal reservasi Anda.
+            </p>
           </div>
-          <div>
-            <h4 className="text-white font-bold text-sm mb-3">Layanan Terintegrasi</h4>
-            <ul className="space-y-1.5">
-              <li>• Peminjaman Ruangan & Aula</li>
-              <li>• Working Space & Inkubasi Bisnis</li>
-              <li>• Studio Dubbing & Multimedia</li>
-              <li>• Pendaftaran Magang / PKL</li>
+
+          <OperationalCalendar events={events} buildings={buildings} height={580} />
+        </div>
+      </section>
+
+      {/* 8. Formal Government Footer (Section 10.2) */}
+      <footer className="bg-primary-900 text-white py-12 px-4 sm:px-6 mt-auto border-t border-primary-800">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-xs leading-relaxed">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-accent-600 text-white rounded flex items-center justify-center font-bold text-xs">
+                CTP
+              </div>
+              <h4 className="font-bold text-sm text-white">UPTD Cimahi Techno Park</h4>
+            </div>
+            <p className="text-neutral-300">
+              Dinas Perdagangan, Koperasi, UKM dan Perindustrian Pemerintah Daerah Kota Cimahi
+            </p>
+            <p className="text-neutral-400">
+              Jl. Baros No. 78, Kel. Utama, Kec. Cimahi Selatan, Kota Cimahi, Jawa Barat 40533
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-bold text-sm text-white">Layanan Terpadu</h4>
+            <ul className="space-y-1.5 text-neutral-300">
+              <li>&bull; Reservasi Fasilitas Ruangan & Aula Gedung</li>
+              <li>&bull; Coworking Space & Inkubasi Bisnis WADUH</li>
+              <li>&bull; Pendaftaran Magang / PKL Siswa & Mahasiswa</li>
+              <li>&bull; Layanan Studio Dubbing & Multimedia BITC</li>
             </ul>
           </div>
-          <div>
-            <h4 className="text-white font-bold text-sm mb-3">Kontak Resmi</h4>
-            <p>Email: technopark@cimahikota.go.id</p>
-            <p>WhatsApp Informasi: 0812-3456-7890</p>
-            <p className="mt-4 text-slate-500">© 2026 UPTD Cimahi Techno Park. Hak Cipta Dilindungi.</p>
+
+          <div className="space-y-2">
+            <h4 className="font-bold text-sm text-white">Kontak Layanan Resmi</h4>
+            <p className="text-neutral-300">Email: technopark@cimahikota.go.id</p>
+            <p className="text-neutral-300">WhatsApp Resmi UPTD: 0812-3456-7890</p>
+            <p className="text-neutral-300">Jam Operasional: Senin - Jumat (08:00 - 16:00 WIB)</p>
+            <p className="pt-2 text-neutral-400 border-t border-primary-800">
+              © 2026 UPTD Cimahi Techno Park. Hak Cipta Dilindungi Regulasi Daerah.
+            </p>
           </div>
         </div>
       </footer>
